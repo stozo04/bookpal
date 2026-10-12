@@ -1,12 +1,8 @@
-# Reader
-
-[![Monorepo CI](https://github.com/Marvy101/reader-source/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Marvy101/reader-source/actions/workflows/ci.yml)
+# Book Pal
 
 **An open-source, native AI reading workspace for macOS.**
 
-**[Download Reader for macOS →](https://reader.marvy101.com/download)**
-
-Reader keeps the book, your notes, web research, and an AI conversation in one
+Book Pal keeps the book, your notes, web research, and an AI conversation in one
 quiet workspace. Import PDF, EPUB, and TXT files; read in a native interface;
 highlight and annotate passages; simplify difficult writing; ask questions
 about a selection, the current page, everything up to your position, or the
