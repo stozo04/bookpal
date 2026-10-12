@@ -39,9 +39,9 @@ targets:
         PRODUCT_MODULE_NAME: Reader
         PRODUCT_NAME: "$(READER_LOCAL_PRODUCT_NAME)"
         GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_FILE: Reader/Info.plist
         INFOPLIST_KEY_CFBundleDisplayName: "$(READER_LOCAL_DISPLAY_NAME)"
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.books
-        INFOPLIST_KEY_ReaderBackendURL: "$(READER_BACKEND_URL)"
         READER_BACKEND_URL: http://127.0.0.1:3000
         MARKETING_VERSION: 0.1.0
         CURRENT_PROJECT_VERSION: 1
