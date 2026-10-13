@@ -1,0 +1,11 @@
+import { chromium } from "@playwright/test";
+const id = process.argv[2];
+const browser = await chromium.connectOverCDP("http://127.0.0.1:9222");
+const page = await browser.contexts()[0].newPage();
+await page.setViewportSize({ width: 1280, height: 860 });
+await page.goto(`http://localhost:3000/read/${id}`, { waitUntil: "networkidle" });
+await page.waitForSelector("iframe");
+await page.waitForTimeout(2000);
+console.log(JSON.stringify(await page.evaluate(() => ({ y: Math.round(scrollY), chapter: document.querySelector("iframe").title }))));
+await page.screenshot({ path: "validation-artifacts/reader-resumed.png" });
+await page.close(); await browser.close();

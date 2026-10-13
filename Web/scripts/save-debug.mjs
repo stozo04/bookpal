@@ -1,0 +1,17 @@
+import { chromium } from "@playwright/test";
+const id = process.argv[2];
+const browser = await chromium.connectOverCDP("http://127.0.0.1:9222");
+const page = await browser.contexts()[0].newPage();
+page.on("request", (r) => { if (r.url().includes("/progress")) { const b = JSON.parse(r.postData() ?? "{}"); console.log(new Date().toISOString().slice(17,23), "POST", b.locator?.resourceID, "pos", b.locator?.position, "prog", b.locator?.progression?.toFixed(3), "overall", b.progress?.toFixed(3)); } });
+page.on("response", (r) => r.url().includes("/progress") && console.log("   ->", r.status()));
+await page.setViewportSize({ width: 1280, height: 860 });
+await page.goto(`http://localhost:3000/read/${id}`, { waitUntil: "networkidle" });
+await page.waitForSelector("iframe"); await page.waitForTimeout(3000);
+console.log(new Date().toISOString().slice(17,23), "jump");
+await page.getByRole("button", { name: "Contents" }).click();
+await page.locator("nav[aria-label=Contents] li button").nth(5).click();
+await page.waitForTimeout(1500);
+console.log(new Date().toISOString().slice(17,23), "scroll");
+await page.evaluate(() => window.scrollTo({ top: 1400 }));
+await page.waitForTimeout(4000);
+await page.close(); await browser.close();

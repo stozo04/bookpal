@@ -1,0 +1,10 @@
+import { chromium } from "@playwright/test";
+const id = process.argv[2];
+const base = process.argv[3] ?? "http://localhost:3000";
+const browser = await chromium.connectOverCDP("http://127.0.0.1:9222");
+const page = await browser.contexts()[0].newPage();
+page.on("console", (m) => m.type() === "error" && console.log("console error:", m.text().slice(0, 120), "\n   at", JSON.stringify(m.location())));
+await page.goto(`${base}/read/${id}`, { waitUntil: "networkidle" });
+await page.waitForSelector("iframe"); await page.waitForTimeout(1500);
+console.log("done", base);
+await page.close(); await browser.close();

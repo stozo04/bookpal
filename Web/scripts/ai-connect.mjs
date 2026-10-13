@@ -1,0 +1,16 @@
+import { chromium } from "@playwright/test";
+const b = await chromium.connectOverCDP("http://127.0.0.1:9222");
+const ctx = b.contexts()[0];
+const p = await ctx.newPage();
+await p.setViewportSize({ width: 1100, height: 800 });
+await p.goto("http://localhost:3000/ai-settings", { waitUntil: "networkidle" });
+await p.getByRole("button", { name: "Connect ChatGPT" }).click();
+await p.waitForURL(/auth\.openai\.com|chatgpt\.com|openai\.com/, { timeout: 20000 }).catch(() => {});
+await p.waitForLoadState("domcontentloaded");
+await p.waitForTimeout(2500);
+const u = new URL(p.url());
+console.log("landed on:", u.hostname + u.pathname);
+console.log("params:", [...u.searchParams.keys()].join(", "));
+console.log("visible text:", (await p.locator("body").innerText()).replace(/\s+/g, " ").slice(0, 400));
+await p.screenshot({ path: "validation-artifacts/openai-consent.png" });
+console.log("tab left open for the next step");

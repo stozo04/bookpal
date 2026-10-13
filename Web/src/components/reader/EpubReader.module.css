@@ -1,0 +1,8 @@
+.center { min-height: 60vh; display: grid; place-content: center; justify-items: center; gap: 20px; text-align: center; }
+.loading { font: italic 18px var(--face); color: var(--voice); margin: 0; }
+.page { padding-top: 56px; }
+.frame { display: block; width: 100%; border: 0; min-height: 70vh; background: var(--bg); }
+.pager { max-width: 35em; margin: 0 auto; padding: 24px 28px 64px; display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--hairline); }
+.pager button { border-color: transparent; background: none; padding: 8px 12px; }
+.pager button:hover:not(:disabled) { border-color: var(--hairline); }
+.pager button:disabled { opacity: .3; cursor: default; }

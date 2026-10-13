@@ -107,3 +107,47 @@ final class ReaderTextIndexTests: XCTestCase {
         XCTAssertLessThanOrEqual(context.after.count, 26)
     }
 }
+
+// The web app (Web/src/lib/locator.ts) saves the reading place in this shape. These
+// strings are copied from Web/tests/locator.test.ts; keep the two in step.
+final class WebLocatorCompatibilityTests: XCTestCase {
+    private func decode(_ json: String) throws -> ReaderLocator {
+        try JSONDecoder().decode(ReaderLocator.self, from: Data(json.utf8))
+    }
+
+    func testWebLocatorsDecodeAsReaderLocators() throws {
+        let fingerprint = String(repeating: "a", count: 64)
+        let epub = try decode(
+            #"{"schemaVersion":1,"publicationFingerprint":"\#(fingerprint)","resourceID":"id-idp140306299499120","position":2381,"progression":0.03,"rectangles":[]}"#
+        )
+        XCTAssertEqual(epub.schemaVersion, 1)
+        XCTAssertEqual(epub.publicationFingerprint, fingerprint)
+        XCTAssertEqual(epub.resourceID, "id-idp140306299499120")
+        XCTAssertEqual(epub.position, 2381)
+        XCTAssertEqual(epub.progression, 0.03, accuracy: 0.0001)
+        XCTAssertNil(epub.textAnchor)
+        XCTAssertTrue(epub.rectangles.isEmpty)
+
+        let pdf = try decode(
+            #"{"schemaVersion":1,"publicationFingerprint":"f","resourceID":"page-6","position":6,"progression":0.055,"rectangles":[]}"#
+        )
+        // The PDF adapter resolves a page from the "page-N" resource ID, else from position.
+        XCTAssertTrue(pdf.resourceID.hasPrefix("page-"))
+        XCTAssertEqual(Int(pdf.resourceID.dropFirst("page-".count)), pdf.position)
+
+        let text = try decode(
+            #"{"schemaVersion":1,"publicationFingerprint":"f","resourceID":"text","position":9000,"progression":0.4,"rectangles":[]}"#
+        )
+        XCTAssertEqual(text.resourceID, "text")
+    }
+
+    func testMacLocatorEncodesWithTheFieldNamesTheWebReads() throws {
+        let locator = ReaderLocator(publicationFingerprint: "f", resourceID: "page-2", position: 2, progression: 0.25)
+        let object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: JSONEncoder().encode(locator)) as? [String: Any]
+        )
+        for key in ["schemaVersion", "publicationFingerprint", "resourceID", "position", "progression", "rectangles"] {
+            XCTAssertNotNil(object[key], "missing \(key)")
+        }
+    }
+}

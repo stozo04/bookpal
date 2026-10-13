@@ -1,0 +1,13 @@
+.block { margin-bottom: 48px; }
+.head { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 14px; }
+.state { display: flex; align-items: center; gap: 10px; margin: 6px 0 0; }
+.dot { width: 9px; height: 9px; border-radius: 999px; border: 1px solid var(--voice); }
+.on { background: var(--ink); border-color: var(--ink); }
+.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.primary:hover { opacity: .88; }
+.head button:disabled { opacity: .5; cursor: default; }
+.segment { display: inline-flex; }
+.segment button { border-radius: 0; padding: 8px 16px; margin-left: -1px; }
+.segment button:first-child { border-radius: 10px 0 0 10px; margin-left: 0; }
+.segment button:last-child { border-radius: 0 10px 10px 0; }
+.segment button[aria-pressed="true"] { background: color-mix(in srgb, var(--ink) 9%, transparent); border-color: var(--ink); position: relative; }

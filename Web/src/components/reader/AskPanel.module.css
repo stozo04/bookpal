@@ -1,0 +1,60 @@
+.scrim { position: fixed; inset: 0; z-index: 23; background: rgb(0 0 0 / .14); }
+.panel { position: fixed; z-index: 24; top: 0; right: 0; bottom: 0; width: min(440px, 100vw); display: flex; flex-direction: column; background: var(--bg); border-left: 1px solid var(--hairline); color: var(--ink); animation: slide .25s ease-out; }
+.head { display: flex; justify-content: space-between; align-items: flex-start; padding: 22px 22px 14px; border-bottom: 1px solid var(--hairline); }
+.head h2 { font: 300 26px Georgia, serif; margin: 0; }
+.model { font-size: 12px; color: var(--voice); margin-top: 2px; }
+.close { width: 36px; height: 36px; padding: 0; display: grid; place-items: center; border-color: transparent; background: none; color: var(--ink); }
+.close svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; }
+.note { padding: 28px 22px; color: var(--voice); display: grid; gap: 16px; justify-items: start; }
+.note p { margin: 0; }
+.log { flex: 1; overflow-y: auto; padding: 22px; display: flex; flex-direction: column; gap: 18px; }
+.empty { color: var(--voice); }
+.empty p { margin: 0 0 14px; font-style: italic; font-family: Georgia, serif; font-size: 17px; }
+.chips { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.chips button { background: none; color: var(--ink); border-color: var(--hairline); font-size: 14px; padding: 7px 14px; }
+.msg { line-height: 1.6; overflow-wrap: anywhere; }
+.msg p { margin: 0 0 .7em; } .msg p:last-child { margin: 0; }
+.msg ul { margin: 0 0 .7em; padding-left: 1.2em; }
+.msg code { font-family: ui-monospace, Menlo, monospace; font-size: .88em; background: color-mix(in srgb, var(--ink) 8%, transparent); padding: 1px 5px; border-radius: 5px; }
+.user { align-self: flex-end; max-width: 88%; background: color-mix(in srgb, var(--ink) 8%, transparent); padding: 10px 14px; border-radius: 12px 12px 4px 12px; font-size: 15px; }
+.bot { font: 16.5px/1.65 Georgia, "Iowan Old Style", serif; }
+.failed { font-style: italic; }
+.thinking { color: var(--voice); font-style: italic; animation: breathe 1.6s ease-in-out infinite; }
+.compose { border-top: 1px solid var(--hairline); padding: 12px 22px 20px; }
+.scopes { display: flex; gap: 18px; margin-bottom: 8px; }
+.scopes button { border: 0; background: none; padding: 4px 0; color: var(--voice); border-bottom: 1px solid transparent; border-radius: 0; font-size: 13px; }
+.scopes button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); }
+.scopes button:disabled { opacity: .4; cursor: default; }
+.quote { margin: 0 0 8px; font: italic 14px/1.5 Georgia, serif; color: var(--voice); }
+.compose form { display: flex; gap: 10px; align-items: flex-end; }
+.compose textarea { flex: 1; resize: none; font: 15px/1.5 system-ui, sans-serif; color: var(--ink); background: none; border: 1px solid var(--hairline); border-radius: 10px; padding: 9px 12px; }
+.compose textarea:focus { border-color: var(--ink); outline: none; }
+.compose form button { color: var(--ink); background: none; border-color: var(--hairline); }
+.compose form button:disabled { opacity: .4; cursor: default; }
+@keyframes slide { from { transform: translateX(14px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes breathe { 0%, 100% { opacity: .45; } 50% { opacity: 1; } }
+@media (max-width: 600px) {
+  .panel { top: auto; left: 0; width: 100%; height: 82vh; border-left: 0; border-top: 1px solid var(--hairline); border-radius: 14px 14px 0 0; animation: rise .25s ease-out; }
+}
+@keyframes rise { from { transform: translateY(16px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.actions button { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; padding: 6px 12px; border-radius: 999px; background: none; color: var(--ink); border-color: var(--hairline); }
+.actions button:disabled { opacity: .45; cursor: default; }
+.actions svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.card { border: 1px solid var(--hairline); border-radius: 12px; padding: 16px 18px; font: 16px/1.65 Georgia, serif; background: color-mix(in srgb, var(--ink) 3%, transparent); }
+.cardHead { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--hairline); }
+.cardHead span:first-child { font: 300 20px Georgia, serif; }
+.upTo { font: 12.5px system-ui, sans-serif; color: var(--voice); }
+.cardFoot { margin-top: 10px; font: 12.5px system-ui, sans-serif; color: var(--voice); display: flex; gap: 10px; align-items: center; }
+.cardFoot button { border: 0; background: none; padding: 0; color: var(--ink); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; font-size: 12.5px; }
+.figure { margin: 0; }
+.figure img { width: 100%; height: auto; display: block; border-radius: 10px; border: 1px solid var(--hairline); animation: fadein .5s ease-out; }
+.figure figcaption { font: italic 14.5px/1.5 Georgia, serif; color: var(--voice); margin-top: 8px; }
+.figureActions { display: flex; gap: 8px; margin-top: 10px; }
+.figureActions button { font-size: 13px; padding: 5px 12px; background: none; color: var(--ink); border-color: var(--hairline); }
+.sketching { aspect-ratio: 4 / 3; border-radius: 10px; border: 1px solid var(--hairline); display: grid; place-items: center; background: linear-gradient(110deg, transparent 30%, color-mix(in srgb, var(--ink) 8%, transparent) 50%, transparent 70%) 0 0 / 220% 100%; animation: shimmer 1.6s ease-in-out infinite; }
+.sketching span { font: italic 15px Georgia, serif; color: var(--voice); }
+@keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
+@keyframes shimmer { from { background-position: 120% 0; } to { background-position: -120% 0; } }
+@media (prefers-reduced-motion: reduce) { .sketching { animation: none; } }

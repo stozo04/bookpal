@@ -1,0 +1,9 @@
+.main { padding: 72px 16px 96px; min-height: 100vh; overflow-x: auto; }
+.list { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 18px; }
+.page { position: relative; flex: none; margin-inline: auto; background: #fff; box-shadow: 0 1px 4px rgb(0 0 0 / .14); }
+.page canvas { display: block; }
+.page :global(.textLayer) { position: absolute; inset: 0; }
+.dark { background: #1a1a1c; }
+.dark canvas { filter: invert(.9) hue-rotate(180deg); }
+.center { min-height: 70vh; display: grid; place-content: center; justify-items: center; gap: 20px; text-align: center; }
+.loading { font: italic 18px var(--face); color: var(--voice); margin: 0; }

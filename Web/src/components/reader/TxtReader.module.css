@@ -1,0 +1,7 @@
+.page { padding-top: 56px; min-height: 100vh; }
+.text { max-width: 35em; margin: 0 auto; padding: 72px 28px 160px; font: var(--fs)/1.7 var(--face); color: var(--ink); overflow-wrap: break-word; hyphens: auto; }
+.text p { margin: 0 0 1em; }
+.text ::selection { background: color-mix(in srgb, var(--ink) 18%, transparent); }
+.center { min-height: 70vh; display: grid; place-content: center; justify-items: center; gap: 20px; text-align: center; }
+.loading { font: italic 18px var(--face); color: var(--voice); margin: 0; }
+@media (max-width: 600px) { .text { padding: 56px 20px 120px; } }

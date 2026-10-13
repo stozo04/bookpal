@@ -1,0 +1,14 @@
+import { chromium } from "@playwright/test";
+import { spawn } from "node:child_process";
+const exe = chromium.executablePath();
+const dir = `/private/tmp/claude-501/-Users-gates-Projects-reader-source/b3bfbf02-60b9-4bc1-93bb-14da5cdfce46/scratchpad/clean-profile`;
+const proc = spawn(exe, ["--headless=new", "--remote-debugging-port=9333", `--user-data-dir=${dir}`, "about:blank"], { stdio: "ignore" });
+await new Promise((r) => setTimeout(r, 2500));
+const browser = await chromium.connectOverCDP("http://127.0.0.1:9333");
+const page = await (browser.contexts()[0] ?? await browser.newContext()).newPage();
+const seen = [];
+page.on("console", (m) => seen.push(m.text().slice(0, 90)));
+await page.setContent('<iframe sandbox="allow-same-origin" srcdoc="<p>hi</p>"></iframe>');
+await page.waitForTimeout(800);
+console.log("clean Chromium, attached over CDP:", seen.length ? seen : "no messages");
+await browser.close(); proc.kill();

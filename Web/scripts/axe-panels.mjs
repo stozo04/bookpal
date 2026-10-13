@@ -1,0 +1,64 @@
+import { chromium } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
+const epub = process.argv[2];
+const b = await chromium.connectOverCDP("http://127.0.0.1:9222");
+const ctx = b.contexts()[0];
+let bad = 0;
+async function scan(page, name) {
+  const r = await new AxeBuilder({ page }).exclude("iframe").withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
+  const found = r.violations.filter((v) => ["serious", "critical", "moderate"].includes(v.impact));
+  console.log(`${found.length ? "ISSUES" : "clean "}  ${name}${found.length ? ": " + found.map((v) => `${v.id}[${v.impact}] x${v.nodes.length}`).join(", ") : ""}`);
+  for (const v of found) for (const n of v.nodes.slice(0, 2)) console.log("          ", v.id, "→", n.target.join(" "), "|", (n.failureSummary ?? "").split("\n")[1]?.trim().slice(0, 120));
+  bad += found.length;
+}
+for (const scheme of ["light", "dark"]) {
+  const page = await ctx.newPage();
+  await page.setViewportSize({ width: 1280, height: 860 });
+  await page.emulateMedia({ colorScheme: scheme });
+  await page.goto(`http://localhost:3000/read/${epub}`, { waitUntil: "networkidle" });
+  await page.waitForTimeout(1500);
+  await page.getByRole("button", { name: "Search" }).click();
+  await page.getByRole("searchbox").fill("lobsters");
+  await page.waitForTimeout(2500);
+  await scan(page, `reader search panel (${scheme})`);
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Ask" }).click();
+  await page.waitForSelector("aside");
+  await page.waitForTimeout(800);
+  await scan(page, `reader ask panel (${scheme})`);
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Book" }).click();
+  await page.waitForTimeout(600);
+  await scan(page, `book panel: about (${scheme})`);
+  await page.getByRole("tab", { name: "Characters" }).click();
+  await page.waitForSelector("svg[aria-label^='Relationship web']", { timeout: 10000 }).catch(() => {});
+  await page.locator("svg[aria-label^='Relationship web'] g[role=button]").first().click().catch(() => {});
+  await page.waitForTimeout(500);
+  await scan(page, `book panel: characters (${scheme})`);
+  await page.getByRole("button", { name: /Open full profile|Full profile/ }).click().catch(() => {});
+  await page.waitForSelector("article h3", { timeout: 8000 }).catch(() => {});
+  await page.waitForTimeout(900); // let the fade-in finish: axe reads colours mid-animation otherwise
+  await scan(page, `character profile (${scheme})`);
+  await page.keyboard.press("Escape");
+  await page.goto("http://localhost:3000/library", { waitUntil: "networkidle" });
+  await page.waitForTimeout(1200);
+  await page.getByRole("button", { name: "Options for Accelerando" }).click();
+  await page.getByRole("menuitem", { name: "Edit details…" }).click();
+  await page.getByRole("dialog").getByLabel("Title").waitFor();
+  await page.waitForTimeout(800);
+  await scan(page, `edit book dialog (${scheme})`);
+  await page.keyboard.press("Escape");
+  await page.goto("http://localhost:3000/profile", { waitUntil: "networkidle" });
+  await scan(page, `profile with appearance (${scheme})`);
+  await page.goto("http://localhost:3000/library", { waitUntil: "networkidle" });
+  await page.getByRole("button", { name: "New folder" }).click();
+  await page.waitForTimeout(400);
+  await scan(page, `new folder dialog (${scheme})`);
+  await page.keyboard.press("Escape");
+  await page.goto("http://localhost:3000/ai-settings", { waitUntil: "networkidle" });
+  await page.waitForSelector("#model");
+  await scan(page, `ai settings connected (${scheme})`);
+  await page.close();
+}
+console.log(bad ? `\n${bad} rule(s) with issues` : "\nno serious, critical or moderate issues");
+await b.close();
