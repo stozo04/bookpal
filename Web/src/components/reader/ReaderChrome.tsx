@@ -37,6 +37,9 @@ export function ReaderChrome({ title, subtitle, progress, hidden, contents, pref
   const catchupHandled = useRef(false);
   const hasAsk = Boolean(ask);
   useEffect(() => {
+    if (panel !== "ask") setRecapOnOpen(false); // only the first opening carries the recap
+  }, [panel]);
+  useEffect(() => {
     if (wantsCatchup && hasAsk && !catchupHandled.current) {
       catchupHandled.current = true;
       setPanel("ask");

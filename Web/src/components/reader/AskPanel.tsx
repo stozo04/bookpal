@@ -258,6 +258,8 @@ export function AskPanel({ ask, onClose, startWith }: { ask: AskConfig; onClose:
   const define = async (selection = captured) => {
     const word = selection.trim();
     if (!word || busy) return;
+    const controller = new AbortController();
+    abort.current = controller;
     setBusy(true);
     setMessages((prev) => [...prev, { role: "user", content: `Define “${word}”` }, { role: "assistant", content: "", kind: "define", status: "Looking it up…" }]);
     const failed = (content: string) => patchLast((m) => ({ ...m, content, failed: true, status: undefined }));
@@ -266,30 +268,44 @@ export function AskPanel({ ask, onClose, startWith }: { ask: AskConfig; onClose:
       if (saved) return void patchLast((m) => ({ ...m, def: saved, cached: true, status: undefined }));
       const context = around((await ask.getContext(ask.scope.id)).excerpt, word);
       const response = await fetch("/api/ai/define", {
-        method: "POST", headers: { "content-type": "application/json" },
+        method: "POST", headers: { "content-type": "application/json" }, signal: controller.signal,
         body: JSON.stringify({ bookTitle: ask.bookTitle, word, context: context || undefined }),
       });
       const data = await response.json().catch(() => null);
       if (!response.ok) return void failed(data?.error?.message ?? "That word couldn’t be defined.");
       patchLast((m) => ({ ...m, def: data.definition, status: undefined }));
       ask.saveWord(word, data.definition);
-    } catch {
-      failed("The connection dropped. Please try again.");
+    } catch (e) {
+      failed((e as Error).name === "AbortError" ? "Stopped." : "The connection dropped. Please try again.");
     } finally {
       setBusy(false);
+      abort.current = null;
     }
   };
 
-  // Arriving from "Catch me up" on the library starts the recap straight away.
+  // Arriving from "Catch me up" on the library starts the recap straight away, once the
+  // reader has returned to the saved place (the recap is taken from everything before it).
   const started = useRef(false);
   const ready0 = Boolean(status?.available && status.connected && status.selection);
+  const catchUpRef = useRef(catchUp);
+  catchUpRef.current = catchUp;
   useEffect(() => {
-    if (startWith === "catchup" && ready0 && !started.current) {
-      started.current = true;
-      void catchUp();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [startWith, ready0]);
+    if (startWith !== "catchup" || !ready0 || started.current) return;
+    let last = -1, steady = 0, tries = 0;
+    const timer = setInterval(() => {
+      const now = ask.getProgress();
+      steady = now > 0 && now === last ? steady + 1 : 0;
+      last = now;
+      if (steady >= 2 || ++tries > 30) {
+        clearInterval(timer);
+        if (!started.current) {
+          started.current = true;
+          void catchUpRef.current();
+        }
+      }
+    }, 300);
+    return () => clearInterval(timer);
+  }, [startWith, ready0, ask]);
 
   const stop = () => abort.current?.abort();
   const ready = status?.available && status.connected && status.selection;
