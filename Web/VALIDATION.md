@@ -50,6 +50,7 @@ Spec: `docs/WEB_VERSION_BUILD_SPEC.md`. Result is one of `PASS`, `FAIL`,
 | W-37 | 8 | AI notes are made once and saved: after reload no model calls | `scripts/saved-notes-replay.mjs` | PASS | cast, profile and summary appear instantly; 0 model calls; `reader_ai_notes` rows verified | 2026-10-13 |
 | W-38 | 8 | Migrations applied to the shared project (4, additive) | counts before/after; advisor | PASS | +3 tables, +16 policies; no non-Reader change; anon has no access; advisor shows nothing new for Reader tables | 2026-10-13 |
 | W-39 | 13 | Accessibility of the new panels, editor, profile and graph; production build with the new routes | `axe-panels.mjs`, `axe-check.mjs`, reader and search regression on a production build | PASS | found and fixed: graph marked as an image with focusable nodes; profile tint taken from the app instead of the reading theme (1.3:1); EPUB bar hiding after resume; all clean in light and dark afterwards | 2026-10-13 |
+| W-40 | 14 | Define a word, Catch me up, Continue reading row, Open Library covers (ideas ported from the v1 app, rebuilt) | `new-features-check.mjs` against the local app, with real model calls | PASS | recap in about 30 s then saved; second ask and a reload made no model call; a word defined in about 6 s then saved; covers found through the same-origin proxy and previewed in the editor; broken thumbnails now drop out of the list | 2026-10-13 |
 
 ## Feature parity matrix
 

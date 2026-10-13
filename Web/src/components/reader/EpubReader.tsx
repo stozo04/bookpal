@@ -74,7 +74,7 @@ function deviceId(): string {
 export function EpubReader({ fileId, fingerprint, fallbackTitle, initial, meta, notes: savedNotes }: {
   fileId: string; fingerprint: string; fallbackTitle: string; initial: Initial; meta: ReaderMeta; notes: ReaderNotes;
 }) {
-  const { notes, saveSummary, saveCast, saveProfile } = useNotes(fileId, savedNotes);
+  const { notes, saveSummary, saveCast, saveProfile, saveWord, saveRecap } = useNotes(fileId, savedNotes);
   const [phase, setPhase] = useState<Phase>("loading");
   const [book, setBook] = useState<EpubBook | null>(null);
   const [index, setIndex] = useState(0);
@@ -320,7 +320,7 @@ export function EpubReader({ fileId, fingerprint, fallbackTitle, initial, meta, 
   }, [book, fileId, fallbackTitle, meta, getTextSoFar, getLabel, notes, saveCast, saveProfile]);
 
   const ask = useMemo<AskConfig | undefined>(() => !book ? undefined : {
-    fileId, getTextSoFar, getLabel, savedSummaries: notes.summaries, saveSummary,
+    fileId, getTextSoFar, getLabel, savedSummaries: notes.summaries, saveSummary, savedWords: notes.words, saveWord, savedRecaps: notes.recaps, saveRecap,
     getProgress: () => (book.spineLength ? (indexRef.current + latest.current.fraction) / book.spineLength : 0),
     bookTitle: meta.titleIsFilename ? (book.title || fallbackTitle) : fallbackTitle,
     scope: { id: "section", label: "This section" },
@@ -332,7 +332,7 @@ export function EpubReader({ fileId, fingerprint, fallbackTitle, initial, meta, 
       const start = text.length > WINDOW && f ? Math.min(Math.max(offsetAtTop(f) - 6_000, 0), text.length - WINDOW) : 0;
       return { excerpt: text.slice(start, start + WINDOW), sectionTitle: chapterRef.current?.title };
     },
-  }, [book, fallbackTitle, fileId, getTextSoFar, getLabel, notes.summaries, saveSummary, meta.titleIsFilename]);
+  }, [book, fallbackTitle, fileId, getTextSoFar, getLabel, notes.summaries, saveSummary, notes.words, saveWord, notes.recaps, saveRecap, meta.titleIsFilename]);
   const search = useMemo<SearchConfig | undefined>(() => !book ? undefined : {
     run: async (query, report, signal) => {
       const found: Hit[] = [];

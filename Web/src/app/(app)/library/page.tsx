@@ -45,16 +45,17 @@ export default async function Library({ searchParams }: { searchParams: Promise<
 
   const { data: states } = await supabase
     .from("reading_states")
-    .select("file_id, progress")
+    .select("file_id, progress, last_opened_at")
     .eq("user_id", user.id);
   const progressById = new Map((states ?? []).map((st) => [st.file_id as string, Number(st.progress)]));
+  const openedById = new Map((states ?? []).map((st) => [st.file_id as string, st.last_opened_at as string]));
 
   const showSample = process.env.NODE_ENV !== "production" && preview === "1";
   const books: Book[] = showSample
     ? SAMPLE
     : (files ?? []).map((f) => ({
         id: f.id, title: f.display_name, mediaType: f.media_type,
-        byteSize: Number(f.byte_size), createdAt: f.created_at, progress: progressById.get(f.id), sha256: f.sha256, filename: f.original_filename, folderId: f.folder_id,
+        byteSize: Number(f.byte_size), createdAt: f.created_at, progress: progressById.get(f.id), openedAt: openedById.get(f.id), sha256: f.sha256, filename: f.original_filename, folderId: f.folder_id,
         author: details.get(f.id)?.author ?? undefined, description: details.get(f.id)?.description ?? undefined, coverVersion: details.get(f.id)?.cover_updated_at ?? null,
       }));
 

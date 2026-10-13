@@ -58,3 +58,18 @@
 @keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
 @keyframes shimmer { from { background-position: 120% 0; } to { background-position: -120% 0; } }
 @media (prefers-reduced-motion: reduce) { .sketching { animation: none; } }
+
+/* Define and Catch me up cards */
+.card h3.sub { font: 600 11.5px system-ui, sans-serif; letter-spacing: .06em; text-transform: uppercase; color: var(--voice); margin: 14px 0 6px; }
+.card .people { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; font-size: 15px; line-height: 1.5; }
+.card .people strong { font-weight: 600; margin-right: 4px; }
+.quiz { display: grid; gap: 6px; }
+.quiz details { border: 1px solid var(--hairline); border-radius: 10px; padding: 8px 12px; font-size: 15px; line-height: 1.5; }
+.quiz summary { cursor: pointer; list-style: none; }
+.quiz summary::-webkit-details-marker { display: none; }
+.quiz summary::after { content: "Show answer"; float: right; margin-left: 12px; font: 12px system-ui, sans-serif; color: var(--voice); text-decoration: underline; text-underline-offset: 3px; }
+.quiz details[open] summary::after { content: "Hide"; }
+.quiz details p { margin: 8px 0 0; padding-top: 8px; border-top: 1px solid var(--hairline); }
+.resume { margin: 14px 0 0; padding: 10px 12px; border-radius: 10px; background: var(--wash); font-size: 15px; line-height: 1.5; }
+.here { font-size: 15px; }
+.example { font-style: italic; color: var(--voice); font-size: 15px; margin-bottom: 0; }
