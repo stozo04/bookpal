@@ -84,6 +84,7 @@ export function EpubReader({ fileId, fingerprint, fallbackTitle, initial, meta, 
   const { theme, size, face } = prefs;
   const [barHidden, setBarHidden] = useState(false);
   const [fraction, setFraction] = useState(0);
+  const [placeRestored, setPlaceRestored] = useState(false);
   const frame = useRef<HTMLIFrameElement>(null);
   const fragmentRef = useRef<string | undefined>(undefined);
   const prefsRef = useRef({ theme, size, face });
@@ -258,11 +259,13 @@ export function EpubReader({ fileId, fingerprint, fallbackTitle, initial, meta, 
         lastY.current = window.scrollY; // a restore is not a reader scrolling away
         setBarHidden(false);
         placeReady.current = true;
+        setPlaceRestored(true);
         onScroll();
       });
       return;
     }
     placeReady.current = true;
+    setPlaceRestored(true);
     onScroll();
     scheduleSave();
   };
@@ -319,7 +322,7 @@ export function EpubReader({ fileId, fingerprint, fallbackTitle, initial, meta, 
     getTextSoFar, getLabel, notes, saveCast, saveProfile,
   }, [book, fileId, fallbackTitle, meta, getTextSoFar, getLabel, notes, saveCast, saveProfile]);
 
-  const ask = useMemo<AskConfig | undefined>(() => !book ? undefined : {
+  const ask = useMemo<AskConfig | undefined>(() => !book || !placeRestored ? undefined : {
     fileId, getTextSoFar, getLabel, savedSummaries: notes.summaries, saveSummary, savedWords: notes.words, saveWord, savedRecaps: notes.recaps, saveRecap,
     getProgress: () => (book.spineLength ? (indexRef.current + latest.current.fraction) / book.spineLength : 0),
     bookTitle: meta.titleIsFilename ? (book.title || fallbackTitle) : fallbackTitle,
@@ -332,7 +335,7 @@ export function EpubReader({ fileId, fingerprint, fallbackTitle, initial, meta, 
       const start = text.length > WINDOW && f ? Math.min(Math.max(offsetAtTop(f) - 6_000, 0), text.length - WINDOW) : 0;
       return { excerpt: text.slice(start, start + WINDOW), sectionTitle: chapterRef.current?.title };
     },
-  }, [book, fallbackTitle, fileId, getTextSoFar, getLabel, notes.summaries, saveSummary, notes.words, saveWord, notes.recaps, saveRecap, meta.titleIsFilename]);
+  }, [book, placeRestored, fallbackTitle, fileId, getTextSoFar, getLabel, notes.summaries, saveSummary, notes.words, saveWord, notes.recaps, saveRecap, meta.titleIsFilename]);
   const search = useMemo<SearchConfig | undefined>(() => !book ? undefined : {
     run: async (query, report, signal) => {
       const found: Hit[] = [];

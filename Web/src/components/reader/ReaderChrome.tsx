@@ -55,6 +55,10 @@ export function ReaderChrome({ title, subtitle, progress, hidden, contents, pref
     return () => document.removeEventListener("keydown", onKey);
   }, [panel]);
 
+  useEffect(() => {
+    if (panel !== "ask") setRecapOnOpen(false);
+  }, [panel]);
+
   const vars = themeVars(prefs.theme, prefs.size, prefs.face) as React.CSSProperties;
   const zoom = sizeLabel === "Zoom";
   const labels = zoom
