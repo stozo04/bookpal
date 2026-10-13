@@ -1,10 +1,8 @@
 name: Web CI
 on:
   pull_request:
-    paths: ["Web/**", ".github/workflows/web-ci.yml"]
   push:
     branches: [main]
-    paths: ["Web/**", ".github/workflows/web-ci.yml"]
 permissions:
   contents: read
 jobs:
