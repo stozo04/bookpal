@@ -287,13 +287,15 @@ export function AskPanel({ ask, onClose, startWith }: { ask: AskConfig; onClose:
   // reader has returned to the saved place (the recap is taken from everything before it).
   const started = useRef(false);
   const ready0 = Boolean(status?.available && status.connected && status.selection);
+  const askRef = useRef(ask);
+  askRef.current = ask;
   const catchUpRef = useRef(catchUp);
   catchUpRef.current = catchUp;
   useEffect(() => {
     if (startWith !== "catchup" || !ready0 || started.current) return;
     let last = -1, steady = 0, tries = 0;
     const timer = setInterval(() => {
-      const now = ask.getProgress();
+      const now = askRef.current.getProgress();
       steady = now > 0 && now === last ? steady + 1 : 0;
       last = now;
       if (steady >= 2 || ++tries > 30) {
@@ -305,7 +307,7 @@ export function AskPanel({ ask, onClose, startWith }: { ask: AskConfig; onClose:
       }
     }, 300);
     return () => clearInterval(timer);
-  }, [startWith, ready0, ask]);
+  }, [startWith, ready0]);
 
   const stop = () => abort.current?.abort();
   const ready = status?.available && status.connected && status.selection;
