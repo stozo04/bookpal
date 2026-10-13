@@ -1,0 +1,26 @@
+name: Web CI
+on:
+  pull_request:
+    paths: ["Web/**", ".github/workflows/web-ci.yml"]
+  push:
+    branches: [main]
+    paths: ["Web/**", ".github/workflows/web-ci.yml"]
+permissions:
+  contents: read
+jobs:
+  web:
+    name: Web typecheck and tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: Web/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
