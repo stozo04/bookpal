@@ -1,0 +1,12 @@
+import { chromium } from "@playwright/test";
+const base = "https://bookpal-web.vercel.app";
+const b = await chromium.connectOverCDP("http://127.0.0.1:9222");
+const p = await b.contexts()[0].newPage();
+await p.setViewportSize({ width: 1200, height: 850 });
+await p.goto(base + "/ai-settings", { waitUntil: "networkidle" });
+await p.waitForTimeout(2500);
+console.log("settings:", (await p.locator("main").innerText()).replace(/\s+/g, " ").slice(0, 260));
+const r = await p.evaluate(async () => { const x = await fetch("/api/ai/models"); return { status: x.status, n: (await x.json()).models?.length }; });
+console.log("models:", r);
+await p.screenshot({ path: "validation-artifacts/live-ai-settings.png" });
+await p.close(); await b.close();

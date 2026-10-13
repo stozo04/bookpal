@@ -1,0 +1,10 @@
+import { chromium } from "@playwright/test";
+import { readFile } from "node:fs/promises";
+const svg = await readFile("src/app/icon.svg", "utf8");
+const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 180, height: 180 } });
+await p.setContent(`<body style="margin:0;background:transparent">${svg.replace("<svg ", '<svg width="180" height="180" ')}</body>`);
+await p.screenshot({ path: "src/app/apple-icon.png", omitBackground: true });
+await p.setViewportSize({ width: 512, height: 512 });
+await p.setContent(`<body style="margin:0;background:#f6f4ef">${svg.replace("<svg ", '<svg width="512" height="512" ')}</body>`);
+await p.screenshot({ path: "validation-artifacts/icon-preview.png" });
+await b.close();

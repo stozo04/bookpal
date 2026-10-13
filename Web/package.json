@@ -12,6 +12,8 @@
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.117.3",
+    "@vercel/analytics": "^2.0.1",
+    "@vercel/blob": "^2.8.1",
     "dompurify": "^3.4.17",
     "jose": "^6.2.12",
     "jszip": "^3.10.2",

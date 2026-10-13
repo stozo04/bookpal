@@ -1,3 +1,4 @@
+import { Analytics } from "@vercel/analytics/next";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import "./globals.css";
@@ -9,7 +10,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const theme = appearance === "light" || appearance === "dark" ? appearance : undefined;
   return (
     <html lang="en" data-theme={theme}>
-      <body>{children}</body>
+      <body>
+        {children}
+        <Analytics />
+      </body>
     </html>
   );
 }

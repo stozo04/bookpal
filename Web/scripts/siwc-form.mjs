@@ -1,0 +1,10 @@
+import { chromium } from "@playwright/test";
+const b = await chromium.connectOverCDP("http://127.0.0.1:9222");
+const p = await b.contexts()[0].newPage();
+await p.setViewportSize({ width: 1100, height: 1000 });
+await p.goto("https://openai.com/form/sign-in-with-chatgpt-interest/", { waitUntil: "networkidle" });
+await p.waitForTimeout(2000);
+console.log(p.url());
+console.log((await p.locator("body").innerText()).replace(/\n{2,}/g, "\n").slice(0, 2500));
+console.log("fields:", await p.locator("input,textarea,select").evaluateAll((els) => els.map((e) => `${e.tagName}:${e.type}:${e.name || e.id}:${e.getAttribute("aria-label") || ""}`)));
+await p.screenshot({ path: "validation-artifacts/siwc-form.png", fullPage: true });

@@ -3,7 +3,7 @@ import { aiFail, aiGuard } from "@/lib/ai/guard";
 import { startConnect } from "@/lib/ai/openai";
 
 export async function POST(request: Request) {
-  const owner = await aiGuard(request, true);
+  const owner = await aiGuard(request, true, true);
   if (owner instanceof NextResponse) return owner;
   try {
     const returnTo = `${new URL(request.url).origin}/ai-settings`;

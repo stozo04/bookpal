@@ -1,0 +1,17 @@
+import { chromium } from "@playwright/test";
+const base = "https://bookpal-web.vercel.app";
+const b = await chromium.connectOverCDP("http://127.0.0.1:9222");
+const p = await b.contexts()[0].newPage();
+await p.setViewportSize({ width: 1200, height: 850 });
+const errs = []; p.on("console", (m) => m.type() === "error" && errs.push(m.text().slice(0, 140)));
+await p.goto(base + "/library", { waitUntil: "networkidle" });
+await p.getByRole("link", { name: /Accelerando/ }).first().click();
+await p.waitForURL(/\/read\//); await p.waitForTimeout(6000);
+const f = p.frameLocator("iframe").first();
+console.log("epub text:", (await f.locator("body").innerText()).slice(0, 80).replace(/\s+/g, " "));
+await p.mouse.move(600, 5); await p.getByRole("button", { name: "Ask" }).click();
+await p.waitForTimeout(1500);
+console.log("ask panel:", (await p.locator("body").innerText()).replace(/\s+/g, " ").match(/.{0,80}(only available|plan|connect)[^.]*\./i)?.[0]);
+await p.screenshot({ path: "validation-artifacts/live-reader.png" });
+console.log("console errors:", errs.length ? errs : "none");
+await p.close(); await b.close();

@@ -4,8 +4,10 @@ import crypto from "node:crypto";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { readStore, updateStore, type Connection } from "./store";
 
-// "Sign in with ChatGPT" for open-source, locally hosted apps, as documented at
-// developers.openai.com/siwc. Plan usage is not available to hosted deployments.
+// "Sign in with ChatGPT" for open-source apps, as documented at developers.openai.com/siwc.
+// The sign-in runs on your own computer (loopback callback); the credentials are then
+// kept in an encrypted private store (see store.ts) that the hosted site also uses, as
+// the documentation's guidance for remote hosts describes.
 const AUTHORIZE = "https://auth.openai.com/api/accounts/authorize";
 const TOKEN = "https://auth.openai.com/api/accounts/oauth/token";
 const DISCOVERY = "https://auth.openai.com/.well-known/openid-configuration";

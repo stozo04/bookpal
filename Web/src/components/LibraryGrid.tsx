@@ -4,8 +4,6 @@ import { metaFromEpub, metaFromPdf, readMeta, writeMeta } from "@/lib/covers";
 import Link from "next/link";
 import { BookMenu } from "./BookMenu";
 import { FolderTile } from "./FolderTile";
-import { NameDialog, api } from "./FolderForms";
-import { useRouter } from "next/navigation";
 import type { Folder } from "@/lib/folders";
 import styles from "./LibraryGrid.module.css";
 
@@ -97,9 +95,7 @@ function useBookMeta(books: Book[], userId: string) {
 export function LibraryGrid({ books, userId, folders = [], currentFolderId = null }: {
   books: Book[]; userId: string; folders?: Folder[]; currentFolderId?: string | null;
 }) {
-  const router = useRouter();
   const bookMeta = useBookMeta(books, userId);
-  const [creating, setCreating] = useState(false);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<"recent" | "title">("recent");
 
@@ -127,10 +123,6 @@ export function LibraryGrid({ books, userId, folders = [], currentFolderId = nul
           <span className="sr">Search your shelf</span>
           <input type="search" placeholder="Search your shelf" value={query} onChange={(e) => setQuery(e.target.value)} />
         </label>
-        <button type="button" className={styles.newFolder} onClick={() => setCreating(true)}>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><path d="M12 11v5M9.5 13.5h5" /></svg>
-          New folder
-        </button>
         <label className={styles.sort}>
           <span className="voice">Sort</span>
           <select className="select" value={sort} onChange={(e) => setSort(e.target.value as "recent" | "title")}>
@@ -139,8 +131,6 @@ export function LibraryGrid({ books, userId, folders = [], currentFolderId = nul
           </select>
         </label>
       </div>
-
-      <NameDialog open={creating} title="New folder" action="Create" onClose={() => setCreating(false)} onDone={() => { setCreating(false); router.refresh(); }} submit={(name) => api.createFolder(name, currentFolderId)} />
 
       {shown.length === 0 && shownFolders.length === 0 ? (
         <p className={`voice ${styles.none}`}>{query ? <>Nothing on your shelf matches “{query}”.</> : "This folder is empty."}</p>

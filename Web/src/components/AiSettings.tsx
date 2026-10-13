@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import styles from "./AiSettings.module.css";
 
-type Status = { available: boolean; connected: boolean; email: string | null; selection: { model: string; reasoning: string; name?: string } | null };
+type Status = { available: boolean; canConnect?: boolean; connected: boolean; email: string | null; selection: { model: string; reasoning: string; name?: string } | null };
 type Model = { slug: string; name: string; reasoning: string[] };
 
 const ERRORS: Record<string, string> = {
@@ -80,7 +80,7 @@ export function AiSettings() {
       <section className={styles.block}>
         <h2 className="section">Not available here</h2>
         <p className="voice">
-          OpenAI lets apps use a ChatGPT plan only when they run on your own computer, and BookPal is currently hosted online. Run BookPal locally to connect your plan.
+          ChatGPT isn’t available right now.
         </p>
       </section>
     );
@@ -103,13 +103,15 @@ export function AiSettings() {
           </div>
           {status.connected ? (
             <button type="button" onClick={disconnect} disabled={busy}>Disconnect</button>
-          ) : (
+          ) : status.canConnect === false ? null : (
             <button type="button" className={styles.primary} onClick={connect} disabled={busy}>{busy ? "Opening…" : "Connect ChatGPT"}</button>
           )}
         </div>
         {!status.connected && (
           <p className="voice">
-            Sign in with ChatGPT to use your plan’s allowance for questions about what you’re reading, instead of paying for API usage. BookPal only receives your name, email and profile picture. It never sees your conversations, and your sign-in stays on this computer.
+            {status.canConnect === false
+              ? "OpenAI only lets you sign in from your own computer. Open BookPal there, connect ChatGPT once, and the connection will work here too."
+              : "Sign in with ChatGPT to use your plan’s allowance for questions about what you’re reading, instead of paying for API usage. BookPal only receives your name, email and profile picture and never sees your conversations. Your sign-in is kept encrypted in your own private storage."}
           </p>
         )}
       </section>
