@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getOwner, sameOrigin } from "@/lib/owner";
 
 const body = z.object({
-  kind: z.enum(["cast", "summary", "character"]),
+  kind: z.enum(["cast", "summary", "character", "word", "recap"]),
   label: z.string().trim().min(1).max(200),
   progress: z.number().min(0).max(1),
   content: z.record(z.string(), z.unknown()),

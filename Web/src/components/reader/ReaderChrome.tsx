@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { SIZE_MAX, SIZE_MIN, SIZE_STEP, THEMES, themeVars, type ThemeName } from "./themes";
 import type { ReaderPrefs } from "./useReaderPrefs";
 import { AskPanel, type AskConfig } from "./AskPanel";
@@ -29,7 +30,22 @@ type Props = {
 // The quiet frame shared by every reader: top bar, progress line, appearance
 // popover and contents drawer. The reader itself is the child.
 export function ReaderChrome({ title, subtitle, progress, hidden, contents, prefs, sizeLabel = "Size", showTypeface = true, ask, search, book, children }: Props) {
+  const wantsCatchup = useSearchParams().get("catchup") === "1";
   const [panel, setPanel] = useState<Panel>(null);
+  const [recapOnOpen, setRecapOnOpen] = useState(false);
+  // Arriving from "Catch me up" on the library: open Ask with a recap once the book is ready.
+  const catchupHandled = useRef(false);
+  const hasAsk = Boolean(ask);
+  useEffect(() => {
+    if (panel !== "ask") setRecapOnOpen(false); // only the first opening carries the recap
+  }, [panel]);
+  useEffect(() => {
+    if (wantsCatchup && hasAsk && !catchupHandled.current) {
+      catchupHandled.current = true;
+      setPanel("ask");
+      setRecapOnOpen(true);
+    }
+  }, [wantsCatchup, hasAsk]);
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
@@ -37,6 +53,10 @@ export function ReaderChrome({ title, subtitle, progress, hidden, contents, pref
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setPanel(null);
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
+  }, [panel]);
+
+  useEffect(() => {
+    if (panel !== "ask") setRecapOnOpen(false);
   }, [panel]);
 
   const vars = themeVars(prefs.theme, prefs.size, prefs.face) as React.CSSProperties;
@@ -141,7 +161,7 @@ export function ReaderChrome({ title, subtitle, progress, hidden, contents, pref
 
       {panel === "book" && book && <BookPanel book={book} onClose={() => setPanel(null)} />}
       {panel === "search" && search && <SearchPanel search={search} initialQuery={searchQuery} onQueryChange={setSearchQuery} onClose={() => setPanel(null)} />}
-      {panel === "ask" && ask && <AskPanel ask={ask} onClose={() => setPanel(null)} />}
+      {panel === "ask" && ask && <AskPanel ask={ask} startWith={recapOnOpen ? "catchup" : undefined} onClose={() => { setRecapOnOpen(false); setPanel(null); }} />}
 
       {children}
     </div>

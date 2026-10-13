@@ -3,7 +3,9 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cleanSvg, download, svgToPng, svgUri } from "@/lib/images";
 import { readEvents } from "@/lib/sse";
-import { findSummary, type ReaderNotes } from "@/lib/notes";
+import { findNear, findSummary, type ReaderNotes } from "@/lib/notes";
+import { around, isLookup, wordKey, type Definition } from "@/lib/define";
+import type { Recap } from "@/lib/recap";
 import styles from "./AskPanel.module.css";
 
 export type AskScope = { id: "selection" | "section" | "page"; label: string };
@@ -22,11 +24,15 @@ export type AskConfig = {
   getProgress: () => number;
   savedSummaries: ReaderNotes["summaries"];
   saveSummary: (label: string, progress: number, text: string) => void;
+  savedWords: ReaderNotes["words"];
+  saveWord: (word: string, def: Definition) => void;
+  savedRecaps: ReaderNotes["recaps"];
+  saveRecap: (label: string, progress: number, recap: Recap) => void;
 };
 
 type Message = {
   role: "user" | "assistant"; content: string; failed?: boolean;
-  kind?: "summary" | "image"; status?: string; label?: string; cached?: boolean; svg?: string; caption?: string; passage?: string;
+  kind?: "summary" | "image" | "define" | "recap"; status?: string; label?: string; cached?: boolean; svg?: string; caption?: string; passage?: string; def?: Definition; recap?: Recap;
 };
 type Status = { available: boolean; connected: boolean; selection: { model: string; reasoning: string; name?: string } | null };
 const LEVELS: Record<string, string> = { xhigh: "Extra high" };
@@ -57,7 +63,7 @@ function Formatted({ text }: { text: string }) {
   );
 }
 
-export function AskPanel({ ask, onClose }: { ask: AskConfig; onClose: () => void }) {
+export function AskPanel({ ask, onClose, startWith }: { ask: AskConfig; onClose: () => void; startWith?: "catchup" }) {
   const [status, setStatus] = useState<Status | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState("");
@@ -217,6 +223,92 @@ export function AskPanel({ ask, onClose }: { ask: AskConfig; onClose: () => void
     }
   };
 
+  // A short refresher for coming back to the book: where things stand, plus a few recall questions.
+  const catchUp = async (force = false) => {
+    if (busy) return;
+    const controller = new AbortController();
+    abort.current = controller;
+    setBusy(true);
+    setMessages((prev) => [...prev, { role: "user", content: "Catch me up." }, { role: "assistant", content: "", kind: "recap", status: "Looking back over what you read…" }]);
+    const failed = (content: string) => patchLast((m) => ({ ...m, content, failed: true, status: undefined }));
+    try {
+      const startedAt = ask.getProgress();
+      const saved = findNear(ask.savedRecaps, startedAt);
+      if (!force && saved) return void patchLast((m) => ({ ...m, recap: saved.recap, label: saved.label, cached: true, status: undefined }));
+      const { text, label } = await ask.getTextSoFar();
+      if (text.length < 200) return void failed("There isn’t enough text before this point to catch up on yet.");
+      patchLast((m) => ({ ...m, label, status: "Putting it together…" }));
+      const response = await fetch("/api/ai/catchup", {
+        method: "POST", headers: { "content-type": "application/json" }, signal: controller.signal,
+        body: JSON.stringify({ bookTitle: ask.bookTitle, label, recent: text.slice(-24_000), summary: findSummary(ask.savedSummaries, startedAt)?.text }),
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) return void failed(data?.error?.message ?? "A recap couldn’t be put together.");
+      patchLast((m) => ({ ...m, recap: data.recap, label, cached: false, status: undefined }));
+      ask.saveRecap(label, startedAt, data.recap);
+    } catch (e) {
+      failed((e as Error).name === "AbortError" ? "Stopped." : "The connection dropped. Please try again.");
+    } finally {
+      setBusy(false);
+      abort.current = null;
+    }
+  };
+
+  // The meaning of a selected word, in general and in this passage. Saved, so each word is looked up once.
+  const define = async (selection = captured) => {
+    const word = selection.trim();
+    if (!word || busy) return;
+    const controller = new AbortController();
+    abort.current = controller;
+    setBusy(true);
+    setMessages((prev) => [...prev, { role: "user", content: `Define “${word}”` }, { role: "assistant", content: "", kind: "define", status: "Looking it up…" }]);
+    const failed = (content: string) => patchLast((m) => ({ ...m, content, failed: true, status: undefined }));
+    try {
+      const saved = ask.savedWords[wordKey(word)];
+      if (saved) return void patchLast((m) => ({ ...m, def: saved, cached: true, status: undefined }));
+      const context = around((await ask.getContext(ask.scope.id)).excerpt, word);
+      const response = await fetch("/api/ai/define", {
+        method: "POST", headers: { "content-type": "application/json" }, signal: controller.signal,
+        body: JSON.stringify({ bookTitle: ask.bookTitle, word, context: context || undefined }),
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) return void failed(data?.error?.message ?? "That word couldn’t be defined.");
+      patchLast((m) => ({ ...m, def: data.definition, status: undefined }));
+      ask.saveWord(word, data.definition);
+    } catch (e) {
+      failed((e as Error).name === "AbortError" ? "Stopped." : "The connection dropped. Please try again.");
+    } finally {
+      setBusy(false);
+      abort.current = null;
+    }
+  };
+
+  // Arriving from "Catch me up" on the library starts the recap straight away, once the
+  // reader has returned to the saved place (the recap is taken from everything before it).
+  const started = useRef(false);
+  const ready0 = Boolean(status?.available && status.connected && status.selection);
+  const askRef = useRef(ask);
+  askRef.current = ask;
+  const catchUpRef = useRef(catchUp);
+  catchUpRef.current = catchUp;
+  useEffect(() => {
+    if (startWith !== "catchup" || !ready0 || started.current) return;
+    let last = -1, steady = 0, tries = 0;
+    const timer = setInterval(() => {
+      const now = askRef.current.getProgress();
+      steady = now > 0 && now === last ? steady + 1 : 0;
+      last = now;
+      if (steady >= 2 || ++tries > 30) {
+        clearInterval(timer);
+        if (!started.current) {
+          started.current = true;
+          void catchUpRef.current();
+        }
+      }
+    }, 300);
+    return () => clearInterval(timer);
+  }, [startWith, ready0]);
+
   const stop = () => abort.current?.abort();
   const ready = status?.available && status.connected && status.selection;
   const scopes: AskScope[] = [{ id: "selection", label: "Selection" }, ask.scope];
@@ -270,6 +362,51 @@ export function AskPanel({ ask, onClose }: { ask: AskConfig; onClose: () => void
                       <div className={styles.sketching} role="status"><span>{m.status ?? "Sketching…"}</span></div>
                     )}
                   </figure>
+                ) : m.kind === "define" && !m.failed ? (
+                  <section key={i} className={styles.card} aria-label="Definition">
+                    {m.def ? (
+                      <>
+                        <div className={styles.cardHead}>
+                          <span>{m.def.word}</span>
+                          {m.def.partOfSpeech && <span className={styles.upTo}>{m.def.partOfSpeech}</span>}
+                        </div>
+                        <p>{m.def.meaning}</p>
+                        {m.def.inContext && <p className={styles.here}><strong>Here:</strong> {m.def.inContext}</p>}
+                        {m.def.example && <p className={styles.example}>{m.def.example}</p>}
+                        {m.cached && <div className={styles.cardFoot}>Looked up before</div>}
+                      </>
+                    ) : <span className={styles.thinking}>{m.status ?? "Looking it up…"}</span>}
+                  </section>
+                ) : m.kind === "recap" && !m.failed ? (
+                  <section key={i} className={styles.card} aria-label="Catch me up">
+                    <div className={styles.cardHead}>
+                      <span>Previously…</span>
+                      {m.label && <span className={styles.upTo}>up to {m.label}</span>}
+                    </div>
+                    {m.recap ? (
+                      <>
+                        <ul>{m.recap.previously.map((line, j) => <li key={j}>{line}</li>)}</ul>
+                        {m.recap.people.length > 0 && (
+                          <>
+                            <h3 className={styles.sub}>Where everyone stands</h3>
+                            <ul className={styles.people}>{m.recap.people.map((p) => <li key={p.name}><strong>{p.name}</strong> {p.now}</li>)}</ul>
+                          </>
+                        )}
+                        {m.recap.questions.length > 0 && (
+                          <>
+                            <h3 className={styles.sub}>Quick check</h3>
+                            <div className={styles.quiz}>
+                              {m.recap.questions.map((q, j) => (
+                                <details key={j}><summary>{q.q}</summary><p>{q.a}</p></details>
+                              ))}
+                            </div>
+                          </>
+                        )}
+                        {m.recap.resume && <p className={styles.resume}>{m.recap.resume}</p>}
+                        {m.cached && <div className={styles.cardFoot}>Saved from earlier <button type="button" disabled={busy} onClick={() => void catchUp(true)}>Redo</button></div>}
+                      </>
+                    ) : <span className={styles.thinking}>{m.status ?? "Thinking…"}</span>}
+                  </section>
                 ) : m.kind === "summary" && !m.failed ? (
                   <section key={i} className={styles.card} aria-label="Story so far">
                     <div className={styles.cardHead}>
@@ -290,6 +427,16 @@ export function AskPanel({ ask, onClose }: { ask: AskConfig; onClose: () => void
             </div>
             <div className={styles.compose}>
               <div className={styles.actions}>
+                <button type="button" onClick={() => void catchUp()} disabled={busy}>
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.5-5.8" /><path d="M4 4v4h4" /><path d="M12 8v4l2.5 2" /></svg>
+                  Catch me up
+                </button>
+                {captured && isLookup(captured) && (
+                  <button type="button" onClick={() => void define()} disabled={busy}>
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5.5A1.5 1.5 0 0 1 6.5 4H18v14H6.5A1.5 1.5 0 0 0 5 19.5z" /><path d="M5 19.5A1.5 1.5 0 0 0 6.5 21H18v-3" /></svg>
+                    Define “{captured.length > 16 ? `${captured.slice(0, 16)}…` : captured}”
+                  </button>
+                )}
                 <button type="button" onClick={() => void summarize()} disabled={busy}>
                   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14M5 11h14M5 16h9" /></svg>
                   Summarize up to here

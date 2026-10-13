@@ -1,0 +1,40 @@
+import { chromium } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
+const base = process.argv[2] ?? "http://localhost:3000";
+const b = await chromium.connectOverCDP("http://127.0.0.1:9222");
+let bad = 0;
+for (const scheme of ["light", "dark"]) {
+  const p = await b.contexts()[0].newPage();
+  await p.setViewportSize({ width: 1200, height: 900 });
+  await p.emulateMedia({ colorScheme: scheme });
+  const scan = async (name, only) => {
+    const builder = new AxeBuilder({ page: p });
+    if (only) builder.include(only);
+    const r = await builder.withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze();
+    const v = r.violations.filter((x) => ["serious", "critical", "moderate"].includes(x.impact));
+    if (v.length) bad++;
+    console.log(v.length ? "ISSUES " : "clean  ", `${name} (${scheme})`, v.map((x) => `${x.id}[${x.impact}] ${x.nodes[0].target}`).join(" | "));
+  };
+  console.log("step: library");
+  await p.goto(base + "/library", { waitUntil: "networkidle" });
+  await p.waitForTimeout(800);
+  await scan("library with Continue reading");
+  await p.goto(base + (await p.getByRole("link", { name: /Catch me up/ }).getAttribute("href")), { waitUntil: "domcontentloaded" });
+  console.log("step: waiting for recap", p.url());
+  await p.waitForSelector("section[aria-label='Catch me up'] details", { timeout: 90000 });
+  console.log("step: recap shown");
+  await p.waitForTimeout(500);
+  await scan("catch me up card", "aside[role=dialog]");
+  await p.locator("section[aria-label='Catch me up'] details summary").first().click();
+  await scan("catch me up card, answer open", "aside[role=dialog]");
+  await p.goto(base + "/library", { waitUntil: "networkidle" });
+  await p.getByRole("button", { name: /Options for/ }).first().click();
+  await p.getByRole("menuitem", { name: "Edit details" }).click();
+  await p.getByRole("button", { name: "Find real covers" }).click();
+  await p.waitForSelector("img[src*='/api/covers/image']", { timeout: 20000 });
+  await p.waitForTimeout(1200);
+  await scan("editor with real covers");
+  await p.close();
+}
+await b.close();
+console.log(bad ? `${bad} scan(s) with issues` : "no serious, critical or moderate issues");

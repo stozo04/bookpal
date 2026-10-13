@@ -16,6 +16,7 @@ export type EditableBook = {
 type Slot = { style: string; svg: string; uri: string } | "loading" | "failed";
 const STYLE_NAMES: Record<string, string> = { typographic: "Typographic", illustrated: "Illustrated", geometric: "Geometric", vintage: "Vintage" };
 const ORDER = ["typographic", "illustrated", "geometric", "vintage"];
+type Real = { id: number; title: string; author: string; year: number | null };
 type Pending = { blob: Blob; url: string; source: string } | "remove" | null;
 
 export function BookEditor({ book, open, onClose }: { book: EditableBook; open: boolean; onClose: () => void }) {
@@ -27,6 +28,8 @@ export function BookEditor({ book, open, onClose }: { book: EditableBook; open: 
   const [slots, setSlots] = useState<Slot[]>([]);
   const [chosen, setChosen] = useState<number | null>(null);
   const [designing, setDesigning] = useState(false);
+  const [real, setReal] = useState<Real[] | "loading" | null>(null);
+  const [chosenReal, setChosenReal] = useState<number | null>(null);
   const [drafting, setDrafting] = useState(false);
   const [ai, setAi] = useState<"unknown" | "ready" | "off">("unknown");
   const [message, setMessage] = useState("");
@@ -38,7 +41,7 @@ export function BookEditor({ book, open, onClose }: { book: EditableBook; open: 
   useEffect(() => {
     if (!open) return;
     setTitle(book.title); setAuthor(book.author); setDescription(book.description);
-    setPending(null); setSlots([]); setChosen(null); setMessage("");
+    setPending(null); setSlots([]); setChosen(null); setReal(null); setChosenReal(null); setMessage("");
     void fetch("/api/ai/status", { cache: "no-store" }).then((r) => r.json()).then((s) => setAi(s.connected ? "ready" : "off")).catch(() => setAi("off"));
     if (book.embeddedCover) embeddedUrl.current = URL.createObjectURL(book.embeddedCover);
     return () => {
@@ -104,7 +107,37 @@ export function BookEditor({ book, open, onClose }: { book: EditableBook; open: 
     }
   };
 
+  // Real covers from Open Library, found by title and author.
+  const findReal = async () => {
+    setMessage("");
+    setReal("loading");
+    try {
+      const query = new URLSearchParams({ title: title.trim() || book.title, ...(author.trim() ? { author: author.trim() } : {}) });
+      const response = await fetch(`/api/covers/search?${query}`);
+      const data = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(data?.error?.message ?? "Covers couldn’t be searched.");
+      setReal(data.covers);
+    } catch (e) {
+      setReal(null);
+      setMessage(e instanceof Error ? e.message : "Covers couldn’t be searched.");
+    }
+  };
+
+  const pickReal = async (id: number) => {
+    setChosenReal(id);
+    setChosen(null);
+    try {
+      const response = await fetch(`/api/covers/image?id=${id}&size=L`);
+      if (!response.ok) throw new Error();
+      await choose(await pictureToCover(new File([await response.blob()], "cover.jpg", { type: "image/jpeg" })), "openlibrary");
+    } catch {
+      setChosenReal(null);
+      setMessage("That cover couldn’t be loaded. Try another.");
+    }
+  };
+
   const pickSuggestion = async (index: number) => {
+    setChosenReal(null);
     const slot = slots[index];
     if (typeof slot === "string") return;
     setChosen(index);
@@ -166,7 +199,7 @@ export function BookEditor({ book, open, onClose }: { book: EditableBook; open: 
             <button type="button" onClick={() => file.current?.click()}>Upload image…</button>
             <input ref={file} type="file" accept="image/*" hidden onChange={(e) => { void upload(e.target.files?.[0]); e.target.value = ""; }} />
             {book.embeddedCover && (
-              <button type="button" onClick={() => { setChosen(null); void choose(book.embeddedCover!, "book"); }}>Use the book’s own cover</button>
+              <button type="button" onClick={() => { setChosen(null); setChosenReal(null); void choose(book.embeddedCover!, "book"); }}>Use the book’s own cover</button>
             )}
             {(book.coverVersion || (pending && pending !== "remove")) && (
               <button type="button" className={styles.quiet} onClick={() => { setChosen(null); setPending(book.coverVersion ? "remove" : null); }}>Remove custom cover</button>
@@ -190,6 +223,31 @@ export function BookEditor({ book, open, onClose }: { book: EditableBook; open: 
             </div>
             <textarea id="edit-description" value={description} onChange={(e) => setDescription(e.target.value)} rows={4} maxLength={4000} placeholder="A sentence or two about the book" />
             <span className={styles.count}>{description.length} / 4000</span>
+          </div>
+
+          <div className={styles.suggest}>
+            <div className={styles.row}>
+              <span className={styles.heading}>Real covers</span>
+              <button type="button" onClick={() => void findReal()} disabled={real === "loading"}>{real === "loading" ? "Searching…" : real ? "Search again" : "Find real covers"}</button>
+            </div>
+            {real === "loading" ? (
+              <ul className={styles.slots}>{[0, 1, 2, 3].map((i) => <li key={i}><div className={`${styles.slot} ${styles.shimmer}`} aria-label="Searching"><span>Searching…</span></div></li>)}</ul>
+            ) : real && real.length > 0 ? (
+              <ul className={styles.slots}>
+                {real.slice(0, 8).map((c) => (
+                  <li key={c.id}>
+                    <button type="button" className={`${styles.slot} ${chosenReal === c.id ? styles.on : ""}`} aria-pressed={chosenReal === c.id} onClick={() => void pickReal(c.id)}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={`/api/covers/image?id=${c.id}&size=M`} alt={`${c.title}${c.author ? ` by ${c.author}` : ""}${c.year ? `, ${c.year}` : ""}`} loading="lazy" onError={() => setReal((all) => (Array.isArray(all) ? all.filter((x) => x.id !== c.id) : all))} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : real ? (
+              <p className={styles.hint}>No covers turned up for that title and author. Try fixing the spelling above.</p>
+            ) : (
+              <p className={styles.hint}>Cover art for published editions, from Open Library.</p>
+            )}
           </div>
 
           <div className={styles.suggest}>

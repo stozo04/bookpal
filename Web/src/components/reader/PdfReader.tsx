@@ -90,7 +90,7 @@ function PageView({ pdf, index, scale, size, dark, onSize }: {
 export function PdfReader({ fileId, fingerprint, title, byteSize, initial, meta, notes: savedNotes }: {
   fileId: string; fingerprint: string; title: string; byteSize: number; initial: Initial; meta: ReaderMeta; notes: ReaderNotes;
 }) {
-  const { notes, saveSummary, saveCast, saveProfile } = useNotes(fileId, savedNotes);
+  const { notes, saveSummary, saveCast, saveProfile, saveWord, saveRecap } = useNotes(fileId, savedNotes);
   const prefs = useReaderPrefs("zoom");
   const { hidden, setHidden, onScrollY, settle } = useAutoHideBar();
   const { schedule } = usePlaceSaver(fileId, fingerprint);
@@ -282,7 +282,7 @@ export function PdfReader({ fileId, fingerprint, title, byteSize, initial, meta,
   } : undefined;
 
   const ask: AskConfig | undefined = pdf ? {
-    fileId, getTextSoFar, getLabel, savedSummaries: notes.summaries, saveSummary, getProgress: () => progressRef.current,
+    fileId, getTextSoFar, getLabel, savedSummaries: notes.summaries, saveSummary, savedWords: notes.words, saveWord, savedRecaps: notes.recaps, saveRecap, getProgress: () => progressRef.current,
     bookTitle: title,
     scope: { id: "page", label: "This page" },
     getSelection: () => window.getSelection()?.toString().trim() ?? "",

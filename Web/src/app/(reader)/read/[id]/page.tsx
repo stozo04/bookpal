@@ -5,6 +5,8 @@ import { PdfReader } from "@/components/reader/PdfReader";
 import { TxtReader } from "@/components/reader/TxtReader";
 import type { Character } from "@/lib/castgraph";
 import type { Profile, ReaderNotes } from "@/lib/notes";
+import type { Definition } from "@/lib/define";
+import type { Recap } from "@/lib/recap";
 
 export default async function Read({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -49,11 +51,13 @@ export default async function Read({ params }: { params: Promise<{ id: string }>
     .select("kind, label, progress, content")
     .eq("file_id", file.id)
     .eq("user_id", owner.userId);
-  const notes: ReaderNotes = { cast: null, summaries: {}, profiles: {} };
+  const notes: ReaderNotes = { cast: null, summaries: {}, profiles: {}, words: {}, recaps: {} };
   for (const row of noteRows ?? []) {
     const c = row.content as Record<string, unknown>;
     if (row.kind === "cast" && Array.isArray(c.characters)) notes.cast = { label: row.label, progress: row.progress, characters: c.characters as Character[] };
     else if (row.kind === "summary" && typeof c.text === "string") notes.summaries[row.label] = { progress: row.progress, text: c.text };
+    else if (row.kind === "word" && c.def) notes.words[row.label] = c.def as Definition;
+    else if (row.kind === "recap" && c.recap) notes.recaps[row.label] = { progress: row.progress, recap: c.recap as Recap };
     else if (row.kind === "character" && c.profile) notes.profiles[row.label] = { label: String(c.label ?? ""), progress: row.progress, profile: c.profile as Profile };
   }
 

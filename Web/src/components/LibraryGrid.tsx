@@ -4,10 +4,11 @@ import { metaFromEpub, metaFromPdf, readMeta, writeMeta } from "@/lib/covers";
 import Link from "next/link";
 import { BookMenu } from "./BookMenu";
 import { FolderTile } from "./FolderTile";
+import { ContinueRow, type ContinueItem } from "./ContinueRow";
 import type { Folder } from "@/lib/folders";
 import styles from "./LibraryGrid.module.css";
 
-export type Book = { id: string; title: string; mediaType: string; byteSize: number; createdAt: string; progress?: number; sha256?: string | null; filename?: string; folderId?: string | null; author?: string; description?: string; coverVersion?: string | null };
+export type Book = { id: string; title: string; mediaType: string; byteSize: number; createdAt: string; progress?: number; openedAt?: string; sha256?: string | null; filename?: string; folderId?: string | null; author?: string; description?: string; coverVersion?: string | null };
 
 const FORMAT: Record<string, string> = {
   "application/epub+zip": "EPUB",
@@ -113,6 +114,18 @@ export function LibraryGrid({ books, userId, folders = [], currentFolderId = nul
   const shownFolders = folders
     .filter((f) => (q ? f.name.toLowerCase().includes(q) : f.parentId === currentFolderId))
     .sort((a, b) => a.name.localeCompare(b.name));
+  // The books you're partway through, most recently read first (only on the top-level shelf).
+  const resuming: ContinueItem[] = q || currentFolderId ? [] : books
+    .filter((b) => b.openedAt && b.progress !== undefined && b.progress > 0 && b.progress < 0.995 && !b.id.startsWith("sample-"))
+    .sort((a, b) => b.openedAt!.localeCompare(a.openedAt!))
+    .slice(0, 3)
+    .map((b) => {
+      const m = bookMeta[b.id];
+      return {
+        id: b.id, title: titleFor(b, m), author: b.author || m?.author, progress: b.progress!, openedAt: b.openedAt!, tone: tone(b.id),
+        cover: b.coverVersion ? `/api/files/${b.id}/cover?v=${encodeURIComponent(b.coverVersion)}` : m?.coverUrl,
+      };
+    });
   const countIn = (id: string) => books.filter((b) => b.folderId === id).length + folders.filter((f) => f.parentId === id).length;
 
   return (
@@ -131,6 +144,8 @@ export function LibraryGrid({ books, userId, folders = [], currentFolderId = nul
           </select>
         </label>
       </div>
+
+      {resuming.length > 0 && <ContinueRow items={resuming} />}
 
       {shown.length === 0 && shownFolders.length === 0 ? (
         <p className={`voice ${styles.none}`}>{query ? <>Nothing on your shelf matches “{query}”.</> : "This folder is empty."}</p>

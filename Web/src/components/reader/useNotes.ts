@@ -2,6 +2,8 @@
 import { useCallback, useState } from "react";
 import type { Character } from "@/lib/castgraph";
 import { putNote, type Profile, type ReaderNotes } from "@/lib/notes";
+import { wordKey, type Definition } from "@/lib/define";
+import type { Recap } from "@/lib/recap";
 
 // The book's saved AI notes, kept in step with what gets saved.
 export function useNotes(fileId: string, initial: ReaderNotes) {
@@ -22,5 +24,17 @@ export function useNotes(fileId: string, initial: ReaderNotes) {
     void putNote(fileId, { kind: "character", label: name, progress, content: { label, profile } });
   }, [fileId]);
 
-  return { notes, saveSummary, saveCast, saveProfile };
+  const saveWord = useCallback((word: string, def: Definition) => {
+    const key = wordKey(word);
+    if (!key) return;
+    setNotes((n) => ({ ...n, words: { ...n.words, [key]: def } }));
+    void putNote(fileId, { kind: "word", label: key, progress: 0, content: { def } });
+  }, [fileId]);
+
+  const saveRecap = useCallback((label: string, progress: number, recap: Recap) => {
+    setNotes((n) => ({ ...n, recaps: { ...n.recaps, [label]: { progress, recap } } }));
+    void putNote(fileId, { kind: "recap", label, progress, content: { recap } });
+  }, [fileId]);
+
+  return { notes, saveSummary, saveCast, saveProfile, saveWord, saveRecap };
 }

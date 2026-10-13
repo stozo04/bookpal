@@ -22,7 +22,7 @@ const normalise = (text: string) =>
 export function TxtReader({ fileId, fingerprint, title, initial, meta, notes: savedNotes }: {
   fileId: string; fingerprint: string; title: string; initial: Initial; meta: ReaderMeta; notes: ReaderNotes;
 }) {
-  const { notes, saveSummary, saveCast, saveProfile } = useNotes(fileId, savedNotes);
+  const { notes, saveSummary, saveCast, saveProfile, saveWord, saveRecap } = useNotes(fileId, savedNotes);
   const prefs = useReaderPrefs();
   const { hidden, setHidden, onScrollY, settle } = useAutoHideBar();
   const { schedule } = usePlaceSaver(fileId, fingerprint);
@@ -138,7 +138,7 @@ export function TxtReader({ fileId, fingerprint, title, initial, meta, notes: sa
   }), [fileId, title, meta, getTextSoFar, getLabel, notes, saveCast, saveProfile]);
 
   const ask = useMemo<AskConfig>(() => ({
-    fileId, getTextSoFar, getLabel, savedSummaries: notes.summaries, saveSummary, getProgress: () => progressRef.current,
+    fileId, getTextSoFar, getLabel, savedSummaries: notes.summaries, saveSummary, savedWords: notes.words, saveWord, savedRecaps: notes.recaps, saveRecap, getProgress: () => progressRef.current,
     bookTitle: title,
     scope: { id: "section", label: "Around here" },
     getSelection: () => window.getSelection()?.toString().trim() ?? "",
@@ -147,7 +147,7 @@ export function TxtReader({ fileId, fingerprint, title, initial, meta, notes: sa
       for (let i = Math.max(0, topParagraph() - 4); i < paragraphs.length && text.length < 24_000; i++) text += `${paragraphs[i].text}\n\n`;
       return { excerpt: text.trim() };
     },
-  }), [title, paragraphs, topParagraph, fileId, getTextSoFar, getLabel, notes.summaries, saveSummary]);
+  }), [title, paragraphs, topParagraph, fileId, getTextSoFar, getLabel, notes.summaries, saveSummary, notes.words, saveWord, notes.recaps, saveRecap]);
 
   const search = useMemo<SearchConfig>(() => ({
     run: async (query, report, signal) => {
