@@ -31,7 +31,7 @@ jobs:
             backend=true
             macos=true
           else
-            files=$(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[].filename')
+            files=$(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[] | .filename, (.previous_filename // empty)')
             while IFS= read -r f; do
               [ -z "$f" ] && continue
               case "$f" in
