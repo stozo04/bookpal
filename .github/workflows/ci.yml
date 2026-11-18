@@ -8,7 +8,47 @@ on:
   workflow_dispatch:
 
 jobs:
+  changes:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      backend: ${{ steps.scope.outputs.backend }}
+      macos: ${{ steps.scope.outputs.macos }}
+    steps:
+      - id: scope
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          COUNT: ${{ github.event.pull_request.changed_files }}
+        run: |
+          set -euo pipefail
+          backend=false
+          macos=false
+          if [ "$COUNT" -ge 3000 ]; then
+            backend=true
+            macos=true
+          else
+            files=$(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[].filename')
+            while IFS= read -r f; do
+              [ -z "$f" ] && continue
+              case "$f" in
+                Web/*) ;;
+                Backend/*) backend=true ;;
+                Reader/*|ReaderTests/*|Reader.xcodeproj/*|TestCorpus/*) macos=true ;;
+                *) backend=true; macos=true ;;
+              esac
+            done <<< "$files"
+          fi
+          echo "backend=$backend" >> "$GITHUB_OUTPUT"
+          echo "macos=$macos" >> "$GITHUB_OUTPUT"
+          echo "Backend job: $backend, macOS job: $macos" >> "$GITHUB_STEP_SUMMARY"
+
   backend:
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.backend != 'false' }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -26,6 +66,8 @@ jobs:
         run: npm run check
 
   macos:
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.macos != 'false' }}
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v7
