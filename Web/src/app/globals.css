@@ -2,6 +2,7 @@
   --paper: #fff; --ink: #1d1d1f; --voice: #6b6b70; --hairline: #c6c6c8; --wash: #f6f4ef;
   --c0: #efe9dc; --c1: #e4e8e1; --c2: #e8e1e4; --c3: #dfe5ea; --c4: #ece6d6; --c5: #e6e2ee;
   --serif: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
+  --danger: #c4302b; --on-danger: #fff;
 }
 /* Appearance: follows the system unless the profile says light or dark (data-theme on <html>). */
 :root { color-scheme: light dark; }
@@ -35,6 +36,8 @@ button, .button {
   transition: border-color .25s ease-out, background-color .25s ease-out;
 }
 button:hover, .button:hover { border-color: var(--ink); }
+button.danger { background: var(--danger); border-color: var(--danger); color: var(--on-danger); }
+button.danger:hover:not(:disabled) { background: color-mix(in srgb, var(--danger) 86%, black); border-color: color-mix(in srgb, var(--danger) 86%, black); }
 :focus-visible { outline: 2px solid color-mix(in srgb, var(--ink) 28%, transparent); outline-offset: 2px; }
 
 .shell { min-height: 100vh; display: flex; flex-direction: column; }

@@ -37,6 +37,8 @@
 .node.picked .ini { fill: var(--bg); }
 .node.dim { opacity: .28; }
 .ini { font: 11px Georgia, serif; fill: var(--ink); pointer-events: none; }
+.node image { pointer-events: none; }
+img.badge { object-fit: cover; object-position: 50% 20%; padding: 0; }
 .label { font: 10px system-ui, sans-serif; fill: var(--ink); paint-order: stroke; stroke: var(--bg); stroke-width: 3px; pointer-events: none; }
 .detail { border: 1px solid var(--hairline); border-radius: 12px; padding: 14px 16px; margin: 6px 0 14px; background: color-mix(in srgb, var(--ink) 3%, transparent); animation: fade .3s ease-out; }
 .detailName { font: 19px Georgia, serif; }
@@ -64,6 +66,16 @@
 .profileHead { display: flex; gap: 16px; align-items: center; margin-bottom: 16px; }
 .bigBadge { width: 56px; height: 56px; border-radius: 999px; border: 1px solid var(--hairline); display: grid; place-items: center; font: 20px Georgia, serif; flex: none; background: var(--wash); }
 .profileName { font: 300 28px/1.15 Georgia, serif; margin: 0; }
+.portrait { width: 96px; height: 96px; border-radius: 999px; object-fit: cover; object-position: 50% 25%; border: 1px solid var(--hairline); flex: none; background: var(--wash); }
+.quiet { border: 0; background: none; padding: 6px 0 0; color: var(--voice); font-size: 13px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.quiet:hover { color: var(--ink); }
+.portraitMaker { border: 1px dashed var(--hairline); border-radius: 12px; padding: 14px 16px; margin: 0 0 18px; display: grid; gap: 10px; justify-items: start; transition: border-color .2s, background .2s; }
+.portraitMaker h3 { font: 13px system-ui, sans-serif; letter-spacing: .09em; text-transform: uppercase; color: var(--voice); margin: 0; font-weight: 500; }
+.portraitMaker p { margin: 0; }
+.dragging { border-color: var(--ink); background: color-mix(in srgb, var(--ink) 4%, transparent); }
+.promptText { width: 100%; box-sizing: border-box; resize: vertical; font: 14px/1.5 Georgia, serif; color: var(--ink); background: var(--wash); border: 1px solid var(--hairline); border-radius: 8px; padding: 10px 12px; }
+.portraitActions { display: flex; gap: 8px; flex-wrap: wrap; }
+.pick { cursor: pointer; }
 .profile { animation: fade .35s ease-out; }
 .profile h3 { font: 13px system-ui, sans-serif; letter-spacing: .09em; text-transform: uppercase; color: var(--voice); margin: 26px 0 8px; font-weight: 500; }
 .profile p { font: 16px/1.65 Georgia, serif; margin: 0 0 8px; }

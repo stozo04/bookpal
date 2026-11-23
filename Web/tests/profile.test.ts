@@ -60,3 +60,15 @@ test("findSummary picks the closest eligible summary", () => {
   assert.equal(findSummary(s, 0.4), null);
   assert.equal(findSummary(s, 0.29)?.text ?? null, null);
 });
+
+test("gatherAppearance keeps only sentences that name the person and describe their looks", async () => {
+  const { gatherAppearance } = await import("../src/lib/mentions.ts");
+  const text = "Oscar laughed. As usual, Oscar was wearing a throwback football jersey from the early 1960s. Lorena wore a red dress. The house was tall.";
+  assert.equal(gatherAppearance(text, ["Oscar"]), "As usual, Oscar was wearing a throwback football jersey from the early 1960s.");
+});
+
+test("gatherAppearance finds a description late in a long book that sampling would skip", async () => {
+  const { gatherAppearance } = await import("../src/lib/mentions.ts");
+  const text = Array.from({ length: 2000 }, (_, i) => `Ada spoke ${i}.`).join(" ") + " Ada wore a grey coat.";
+  assert.equal(gatherAppearance(text, ["Ada"]), "Ada wore a grey coat.");
+});

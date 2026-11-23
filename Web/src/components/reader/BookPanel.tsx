@@ -1,11 +1,15 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { BookEditor } from "../BookEditor";
+import { Dialog } from "../Dialog";
+import forms from "../FolderForms.module.css";
 import { readMeta } from "@/lib/covers";
 import { GRAPH_H, GRAPH_W, initials, layout, type Character } from "@/lib/castgraph";
-import { gatherMentions, nameVariants } from "@/lib/mentions";
-import { atThisPlace, type Profile, type ReaderNotes } from "@/lib/notes";
+import { gatherAppearance, gatherMentions, nameVariants } from "@/lib/mentions";
+import { atThisPlace, notAhead, type Profile, type ReaderNotes } from "@/lib/notes";
+import { pictureToCover } from "@/lib/images";
+import { portraitKey } from "@/lib/portrait";
 import { useRouter } from "next/navigation";
 import { readEvents } from "@/lib/sse";
 import styles from "./BookPanel.module.css";
@@ -36,7 +40,7 @@ export function BookPanel({ book, onClose }: { book: BookConfig; onClose: () => 
   const [embeddedUrl, setEmbeddedUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !editing && onClose();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !editing && !document.querySelector("dialog[open]") && onClose();
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose, editing]);
@@ -170,6 +174,9 @@ function CastView({ book }: { book: BookConfig }) {
   };
 
   const graph = useMemo(() => (cast ? layout(cast.characters) : null), [cast]);
+  const names = useMemo(() => cast?.characters.map((c) => c.name) ?? [], [cast]);
+  const portraits = usePortraits(info.fileId, names);
+  const clipId = useId();
   const chosen = cast?.characters.find((c) => c.name === selected) ?? null;
   // Labels on the lines only when there are few enough to read; the card lists them all.
   const quiet = chosen ? (graph?.edges.filter((e) => e.a === chosen.name || e.b === chosen.name).length ?? 0) <= 4 : true;
@@ -185,7 +192,7 @@ function CastView({ book }: { book: BookConfig }) {
 
   if (cast && profileOf) {
     const who = cast.characters.find((c) => c.name === profileOf);
-    if (who) return <ProfileView book={book} character={who} cast={cast.characters} onBack={() => setProfileOf(null)} onOpen={(n) => { setProfileOf(null); setSelected(n); }} />;
+    if (who) return <ProfileView book={book} character={who} cast={cast.characters} portrait={portraits.forName(who.name)} onBack={() => setProfileOf(null)} onOpen={(n) => { setProfileOf(null); setSelected(n); }} />;
   }
 
   if (!cast) {
@@ -236,8 +243,9 @@ function CastView({ book }: { book: BookConfig }) {
               </g>
             );
           })}
-          {graph.nodes.map((n) => {
+          {graph.nodes.map((n, i) => {
             const c = cast.characters.find((x) => x.name === n.name)!;
+            const photo = portraits.urlOf(n.name);
             const r = 14 + Math.min(n.degree, 5) * 1.6;
             const faded = chosen && !related.has(n.name);
             return (
@@ -246,7 +254,14 @@ function CastView({ book }: { book: BookConfig }) {
                 onClick={() => setSelected(selected === n.name ? null : n.name)}
                 onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), setSelected(selected === n.name ? null : n.name))}>
                 <circle r={r} />
-                <text className={styles.ini} textAnchor="middle" dy="0.35em">{initials(n.name)}</text>
+                {photo ? (
+                  <>
+                    <clipPath id={`${clipId}-${i}`}><circle r={r - 1} /></clipPath>
+                    <image href={photo} x={-r} y={-r} width={r * 2} height={r * 2} preserveAspectRatio="xMidYMin slice" clipPath={`url(#${clipId}-${i})`} />
+                  </>
+                ) : (
+                  <text className={styles.ini} textAnchor="middle" dy="0.35em">{initials(n.name)}</text>
+                )}
                 <text className={styles.label} textAnchor="middle" y={r + 11}>{n.name.split(" ")[0]}</text>
               </g>
             );
@@ -274,7 +289,10 @@ function CastView({ book }: { book: BookConfig }) {
         {cast.characters.map((c) => (
           <li key={c.name}>
             <button type="button" aria-pressed={selected === c.name} onClick={() => setSelected(selected === c.name ? null : c.name)}>
-              <span className={styles.badge} aria-hidden="true">{initials(c.name)}</span>
+              {portraits.urlOf(c.name)
+                // eslint-disable-next-line @next/next/no-img-element
+                ? <img className={styles.badge} src={portraits.urlOf(c.name)!} alt="" />
+                : <span className={styles.badge} aria-hidden="true">{initials(c.name)}</span>}
               <span className={styles.who}>
                 <span className={styles.whoName}>{c.name}</span>
                 <span className={styles.whoRole}>{c.role || c.description.slice(0, 60)}</span>
@@ -287,12 +305,23 @@ function CastView({ book }: { book: BookConfig }) {
   );
 }
 
+// Every passage so far that mentions one person, for the AI notes written about them.
+async function passagesAbout(book: BookConfig, character: Character, cast: Character[], setStatus: (m: string) => void) {
+  setStatus("Gathering what you’ve read…");
+  const { text, label } = await book.getTextSoFar((m) => setStatus(m));
+  setStatus(`Finding every place ${character.name.split(" ")[0]} appears…`);
+  const others = cast.filter((c) => c.name !== character.name).map((c) => c.name);
+  const variants = nameVariants(character.name, character.aliases, others);
+  return { passages: gatherMentions(text, variants), looks: gatherAppearance(text, variants), label, others };
+}
+
 // Everything the story has shown about one person, built once from every passage that
 // mentions them and then saved.
-function ProfileView({ book, character, cast, onBack, onOpen }: {
-  book: BookConfig; character: Character; cast: Character[]; onBack: () => void; onOpen: (name: string) => void;
+function ProfileView({ book, character, cast, portrait, onBack, onOpen }: {
+  book: BookConfig; character: Character; cast: Character[]; portrait: Portrait; onBack: () => void; onOpen: (name: string) => void;
 }) {
   const saved = book.notes.profiles[character.name];
+  const [removing, setRemoving] = useState(false);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -301,12 +330,8 @@ function ProfileView({ book, character, cast, onBack, onOpen }: {
     setBusy(true);
     setError("");
     try {
-      setStatus("Gathering what you’ve read…");
       const startedAt = book.getProgress();
-      const { text, label } = await book.getTextSoFar((m) => setStatus(m));
-      setStatus(`Finding every place ${character.name.split(" ")[0]} appears…`);
-      const others = cast.filter((c) => c.name !== character.name).map((c) => c.name);
-      const passages = gatherMentions(text, nameVariants(character.name, character.aliases, others));
+      const { passages, label, others } = await passagesAbout(book, character, cast, setStatus);
       if (passages.length < 40) { setError(`${character.name} hasn’t appeared enough yet for a profile.`); return; }
       setStatus(`Writing about ${character.name.split(" ")[0]}…`);
       const r = await fetch("/api/ai/character", {
@@ -338,13 +363,28 @@ function ProfileView({ book, character, cast, onBack, onOpen }: {
     <div className={styles.body}>
       <button type="button" className={styles.back} onClick={onBack}><span aria-hidden="true">←</span> All characters</button>
       <div className={styles.profileHead}>
-        <span className={styles.bigBadge} aria-hidden="true">{initials(character.name)}</span>
+        {portrait.url
+          // eslint-disable-next-line @next/next/no-img-element
+          ? <img className={styles.portrait} src={portrait.url} alt={`Portrait of ${character.name}`} />
+          : <span className={styles.bigBadge} aria-hidden="true">{initials(character.name)}</span>}
         <div>
           <h2 className={styles.profileName}>{character.name}</h2>
           {character.role && <div className={styles.aka}>{character.role}</div>}
           {character.aliases.length > 0 && <div className={styles.aka}>Also called {character.aliases.join(", ")}</div>}
+          {portrait.url && <button type="button" className={styles.quiet} onClick={() => setRemoving(true)}>Remove portrait</button>}
         </div>
       </div>
+      <RemovePortraitDialog open={removing} name={character.name} onClose={() => setRemoving(false)} remove={portrait.remove} />
+      {portrait.failed && (
+        <div className={styles.portraitMaker} role="alert">
+          <p className={styles.note}>Portraits couldn’t be loaded.</p>
+          <button type="button" onClick={portrait.retry}>Try again</button>
+        </div>
+      )}
+      {portrait.ready && !portrait.url && (
+        <PortraitMaker book={book} character={character} cast={cast} onSave={portrait.save}
+          known={saved && notAhead(saved.progress, book.getProgress()) ? saved.profile : undefined} />
+      )}
 
       {!p ? (
         <div>
@@ -394,5 +434,229 @@ function ProfileView({ book, character, cast, onBack, onOpen }: {
         </article>
       )}
     </div>
+  );
+}
+
+type SavedPortrait = { key: string; version: string };
+
+// The saved portrait for one character, if there is one.
+type Portrait = {
+  url: string | null;
+  ready: boolean;
+  failed: boolean;
+  retry: () => void;
+  save: (picture: Blob) => Promise<string | null>;
+  remove: () => Promise<string | null>;
+};
+
+// Every saved portrait in the book, shared by the web, the cast list and the profile so a
+// change in one shows in all of them.
+function usePortraits(fileId: string, names: string[]) {
+  const [versions, setVersions] = useState<Record<string, string> | null>(null); // by key
+  const [keys, setKeys] = useState<Record<string, string>>({}); // by name
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const nameList = names.join("\n");
+
+  // Until the list arrives nothing is offered: guessing "none" could hide a saved picture
+  // and let a new upload replace it unseen.
+  useEffect(() => {
+    let live = true;
+    setFailed(false);
+    void fetch(`/api/files/${fileId}/portraits`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((d: { portraits: SavedPortrait[] }) => live && setVersions(Object.fromEntries(d.portraits.map((p) => [p.key, p.version]))))
+      .catch(() => live && setFailed(true));
+    return () => { live = false; };
+  }, [fileId, attempt]);
+  const retry = () => setAttempt((n) => n + 1);
+
+  useEffect(() => {
+    let live = true;
+    const list = nameList ? nameList.split("\n") : [];
+    void Promise.all(list.map(async (n) => [n, await portraitKey(n)] as const)).then((pairs) => live && setKeys(Object.fromEntries(pairs)));
+    return () => { live = false; };
+  }, [nameList]);
+
+  const pathOf = (key: string) => `/api/files/${fileId}/portraits/${key}`;
+  const urlOf = (name: string): string | null => {
+    const key = keys[name];
+    const version = key ? versions?.[key] : undefined;
+    return key && version !== undefined ? `${pathOf(key)}?v=${encodeURIComponent(version)}` : null;
+  };
+
+  const forName = (name: string): Portrait => {
+    const key = keys[name];
+    return {
+      url: urlOf(name),
+      ready: versions !== null && Boolean(key),
+      failed: versions === null && failed,
+      retry,
+      save: async (picture) => {
+        if (!key) return "The portrait couldn’t be saved.";
+        const r = await fetch(pathOf(key), { method: "PUT", headers: { "content-type": "image/jpeg" }, body: picture }).catch(() => null);
+        if (!r?.ok) return (await r?.json().catch(() => null))?.error?.message ?? "The portrait couldn’t be saved.";
+        setVersions((v) => ({ ...v, [key]: String(Date.now()) }));
+        return null;
+      },
+      remove: async () => {
+        if (!key) return "The portrait couldn’t be removed.";
+        const r = await fetch(pathOf(key), { method: "DELETE" }).catch(() => null);
+        if (!r?.ok) return (await r?.json().catch(() => null))?.error?.message ?? "The portrait couldn’t be removed.";
+        setVersions((v) => {
+          const next = { ...v };
+          delete next[key];
+          return next;
+        });
+        return null;
+      },
+    };
+  };
+  return { urlOf, forName };
+}
+
+function RemovePortraitDialog({ open, name, onClose, remove }: {
+  open: boolean; name: string; onClose: () => void; remove: () => Promise<string | null>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const close = () => { setError(""); onClose(); };
+  const confirm = async () => {
+    setBusy(true);
+    const problem = await remove();
+    setBusy(false);
+    if (problem) setError(problem);
+    else close();
+  };
+  return (
+    <Dialog open={open} title="Remove this portrait?" onClose={close}>
+      <p className="voice">The picture of {name} will be deleted. You can write a new prompt and add another afterwards.</p>
+      {error && <p className={forms.error} role="alert">{error}</p>}
+      <div className={forms.actions}>
+        <button type="button" onClick={close}>Cancel</button>
+        <button type="button" className="danger" disabled={busy} onClick={() => void confirm()}>{busy ? "Removing…" : "Remove"}</button>
+      </div>
+    </Dialog>
+  );
+}
+
+const PORTRAIT_WIDTH = 640;
+
+// A copied image can arrive as a file or only as a clipboard item, depending on the browser.
+function pastedImage(data: DataTransfer | null): File | undefined {
+  if (!data) return undefined;
+  const isImage = (type: string) => type.startsWith("image/");
+  return Array.from(data.files).find((f) => isImage(f.type))
+    ?? Array.from(data.items).find((i) => i.kind === "file" && isImage(i.type))?.getAsFile()
+    ?? undefined;
+}
+
+// No picture yet: write a prompt from the book to paste into ChatGPT, then take the
+// picture it makes (chosen, dropped or pasted) and save it.
+function PortraitMaker({ book, character, cast, known, onSave }: {
+  book: BookConfig; character: Character; cast: Character[]; known?: Profile; onSave: (picture: Blob) => Promise<string | null>;
+}) {
+  const [prompt, setPrompt] = useState("");
+  const [status, setStatus] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState<null | "writing" | "saving">(null);
+  const [copied, setCopied] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const first = character.name.split(" ")[0];
+
+  const write = async () => {
+    setBusy("writing");
+    setError("");
+    try {
+      const { passages, looks } = await passagesAbout(book, character, cast, setStatus);
+      // A first-person narrator is rarely named, so the saved profile fills in for them.
+      const notes = known ? [known.summary, known.traits.join(", "), known.wants].filter(Boolean).join("\n") : "";
+      if (passages.length < 40 && !notes) { setError(`${character.name} hasn’t appeared enough yet to describe.`); return; }
+      setStatus(`Describing how ${first} looks…`);
+      const r = await fetch("/api/ai/portrait-prompt", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: character.name, aliases: character.aliases, role: character.role, looks, passages, notes }),
+      });
+      const data = await r.json().catch(() => null);
+      if (!r.ok) { setError(data?.error?.message ?? "The portrait prompt couldn’t be written."); return; }
+      setPrompt(String(data.prompt));
+      setCopied(false);
+    } catch {
+      setError("The connection dropped. Please try again.");
+    } finally {
+      setBusy(null);
+      setStatus("");
+    }
+  };
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(prompt);
+      setCopied(true);
+    } catch {
+      setError("Copying was blocked. Select the text and copy it instead.");
+    }
+  };
+
+  const take = async (file: File | undefined) => {
+    if (!file || busy) return;
+    if (!file.type.startsWith("image/")) { setError("That isn’t a picture."); return; }
+    setBusy("saving");
+    setError("");
+    setStatus("Saving the portrait…");
+    try {
+      const problem = await onSave(await pictureToCover(file, PORTRAIT_WIDTH));
+      if (problem) setError(problem);
+    } catch {
+      setError("That picture couldn’t be read.");
+    } finally {
+      setBusy(null);
+      setStatus("");
+    }
+  };
+
+  // Paste works anywhere while this box is showing: the box itself rarely has focus.
+  const takeRef = useRef(take);
+  takeRef.current = take;
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      const picture = pastedImage(e.clipboardData);
+      if (!picture) return;
+      e.preventDefault();
+      void takeRef.current(picture);
+    };
+    document.addEventListener("paste", onPaste);
+    return () => document.removeEventListener("paste", onPaste);
+  }, []);
+
+  return (
+    <section
+      className={`${styles.portraitMaker} ${dragging ? styles.dragging : ""}`} aria-label={`Portrait of ${character.name}`}
+      onDragOver={(e) => { e.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)}
+      onDrop={(e) => { e.preventDefault(); setDragging(false); void take(e.dataTransfer.files[0]); }}
+    >
+      <h3>Portrait</h3>
+      {prompt ? (
+        <>
+          <textarea className={styles.promptText} readOnly value={prompt} rows={7} aria-label="Portrait prompt" onFocus={(e) => e.currentTarget.select()} />
+          <div className={styles.portraitActions}>
+            <button type="button" className={styles.primary} onClick={() => void copy()}>{copied ? "Copied" : "Copy prompt"}</button>
+            <button type="button" onClick={() => void write()} disabled={Boolean(busy)}>Rewrite</button>
+          </div>
+          <p className={styles.note}>Paste it into ChatGPT, then drop, paste or choose the picture here.</p>
+        </>
+      ) : (
+        <>
+          <p className={styles.note}>A prompt describing {first} from what you’ve read, to paste into ChatGPT.</p>
+          <button type="button" className={styles.primary} onClick={() => void write()} disabled={Boolean(busy)}>{busy === "writing" ? "Writing…" : "Write portrait prompt"}</button>
+        </>
+      )}
+      <label className={`button ${styles.pick}`}>
+        Add picture…
+        <input type="file" accept="image/*" hidden disabled={Boolean(busy)} onChange={(e) => { void take(e.target.files?.[0]); e.target.value = ""; }} />
+      </label>
+      {busy && <p className={styles.status} role="status">{status}</p>}
+      {error && <p className="error" role="alert">{error}</p>}
+    </section>
   );
 }
