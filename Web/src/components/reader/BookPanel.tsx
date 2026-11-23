@@ -453,7 +453,8 @@ function usePortraits(fileId: string, names: string[]) {
     void fetch(`/api/files/${fileId}/portraits`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((d: { portraits: SavedPortrait[] }) => live && setVersions(Object.fromEntries(d.portraits.map((p) => [p.key, p.version]))))
-      .catch(() => {});
+      // Without the list, still offer to add one: saving overwrites, so nothing is lost.
+      .catch(() => live && setVersions({}));
     return () => { live = false; };
   }, [fileId]);
 
@@ -526,6 +527,15 @@ function RemovePortraitDialog({ open, name, onClose, remove }: {
 
 const PORTRAIT_WIDTH = 640;
 
+// A copied image can arrive as a file or only as a clipboard item, depending on the browser.
+function pastedImage(data: DataTransfer | null): File | undefined {
+  if (!data) return undefined;
+  const isImage = (type: string) => type.startsWith("image/");
+  return Array.from(data.files).find((f) => isImage(f.type))
+    ?? Array.from(data.items).find((i) => i.kind === "file" && isImage(i.type))?.getAsFile()
+    ?? undefined;
+}
+
 // No picture yet: write a prompt from the book to paste into ChatGPT, then take the
 // picture it makes (chosen, dropped or pasted) and save it.
 function PortraitMaker({ book, character, cast, known, onSave }: {
@@ -590,12 +600,25 @@ function PortraitMaker({ book, character, cast, known, onSave }: {
     }
   };
 
+  // Paste works anywhere while this box is showing: the box itself rarely has focus.
+  const takeRef = useRef(take);
+  takeRef.current = take;
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      const picture = pastedImage(e.clipboardData);
+      if (!picture) return;
+      e.preventDefault();
+      void takeRef.current(picture);
+    };
+    document.addEventListener("paste", onPaste);
+    return () => document.removeEventListener("paste", onPaste);
+  }, []);
+
   return (
     <section
       className={`${styles.portraitMaker} ${dragging ? styles.dragging : ""}`} aria-label={`Portrait of ${character.name}`}
       onDragOver={(e) => { e.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)}
       onDrop={(e) => { e.preventDefault(); setDragging(false); void take(e.dataTransfer.files[0]); }}
-      onPaste={(e) => void take(Array.from(e.clipboardData.files).find((f) => f.type.startsWith("image/")))}
     >
       <h3>Portrait</h3>
       {prompt ? (

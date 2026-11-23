@@ -43,6 +43,8 @@ function offsetAtTop(frame: HTMLIFrameElement): number {
 }
 
 const LINE_STEP = 16;
+const BLOCKS = "p, div, li, blockquote, pre, h1, h2, h3, h4, h5, h6, dt, dd, td, th, figcaption, section, aside";
+const tidy = (text: string) => text.replace(/[^\S\n]+/g, " ").replace(/ *\n[\s]*/g, "\n\n").trim();
 
 // Everything in the chapter up to the bottom of the visible page: what the reader can
 // see counts as read. Null when the browser can't map a point to text.
@@ -58,11 +60,17 @@ function textUpToBottom(frame: HTMLIFrameElement): string | null {
     const range = doc.caretRangeFromPoint(x, y);
     if (!range || range.startContainer.nodeType !== Node.TEXT_NODE || !root.contains(range.startContainer)) continue;
     const parts: string[] = [];
+    let block: Element | null = null;
     for (const node of textNodes(root, doc)) {
+      // Separate blocks the way plainText does, so a name opening a paragraph never fuses
+      // with the word that closed the last one.
+      const here = node.parentElement?.closest(BLOCKS) ?? null;
+      if (block && here !== block) parts.push("\n\n");
+      block = here;
       if (node === range.startContainer) {
         const rest = node.data.slice(range.startOffset);
         parts.push(node.data.slice(0, range.startOffset) + (rest.match(/^[^.!?]*[.!?”"’]*/)?.[0] ?? ""));
-        return parts.join("").replace(/\s+/g, " ").trim();
+        return tidy(parts.join(""));
       }
       parts.push(node.data);
     }
@@ -332,20 +340,23 @@ export function EpubReader({ fileId, fingerprint, fallbackTitle, initial, meta, 
   // Everything before the reader's place: earlier chapters in full, this one up to where they are.
   const getTextSoFar = useCallback(async (progress?: (message: string) => void) => {
     if (!book) return { text: "", label: "" };
+    // Take the place and the visible text before any await, so turning a chapter while
+    // earlier ones load can't swap in text the reader hasn't reached.
     const i = indexRef.current;
     const fr = latest.current.fraction;
+    const label = getLabel();
+    const visible = frame.current ? textUpToBottom(frame.current) : null;
     const parts: string[] = [];
     for (let k = 0; k < i; k++) {
       if (k % 4 === 0) progress?.(`Reading chapter ${k + 1} of ${i + 1}…`);
       parts.push(await book.plainText(k));
     }
-    const visible = frame.current ? textUpToBottom(frame.current) : null;
     if (visible) parts.push(visible);
     else {
       const current = await book.plainText(i);
       parts.push(current.slice(0, Math.round(current.length * fr)));
     }
-    return { text: parts.join("\n\n"), label: getLabel() };
+    return { text: parts.join("\n\n"), label };
   }, [book, getLabel]);
 
   const bookConfig = useMemo<BookConfig | undefined>(() => !book ? undefined : {
