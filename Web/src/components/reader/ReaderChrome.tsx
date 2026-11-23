@@ -7,9 +7,11 @@ import type { ReaderPrefs } from "./useReaderPrefs";
 import { AskPanel, type AskConfig } from "./AskPanel";
 import { SearchPanel, type SearchConfig } from "./SearchPanel";
 import { BookPanel, type BookConfig } from "./BookPanel";
+import type { SaveNotice } from "./useReadingPlace";
 import styles from "./ReaderChrome.module.css";
 
 export type ContentsItem = { label: string; depth: number; current?: boolean; onSelect: () => void };
+const SAVE_NOTICE_TEXT = { failed: "Couldn’t save your place", "signed-out": "Sign in again to save your place" } as const;
 type Panel = "contents" | "appearance" | "ask" | "search" | "book" | null;
 
 type Props = {
@@ -24,7 +26,7 @@ type Props = {
   ask?: AskConfig;
   search?: SearchConfig;
   book?: BookConfig;
-  saveFailed?: boolean;
+  saveNotice?: SaveNotice;
   /** Shown as chevrons in the top bar; each is omitted when there is no chapter that way. */
   onPrevChapter?: () => void;
   onNextChapter?: () => void;
@@ -33,7 +35,7 @@ type Props = {
 
 // The quiet frame shared by every reader: top bar, progress line, appearance
 // popover and contents drawer. The reader itself is the child.
-export function ReaderChrome({ title, subtitle, progress, hidden, contents, prefs, sizeLabel = "Size", showTypeface = true, ask, search, book, saveFailed = false, onPrevChapter, onNextChapter, children }: Props) {
+export function ReaderChrome({ title, subtitle, progress, hidden, contents, prefs, sizeLabel = "Size", showTypeface = true, ask, search, book, saveNotice = null, onPrevChapter, onNextChapter, children }: Props) {
   const wantsCatchup = useSearchParams().get("catchup") === "1";
   const [panel, setPanel] = useState<Panel>(null);
   const [recapOnOpen, setRecapOnOpen] = useState(false);
@@ -179,8 +181,8 @@ export function ReaderChrome({ title, subtitle, progress, hidden, contents, pref
       {panel === "search" && search && <SearchPanel search={search} initialQuery={searchQuery} onQueryChange={setSearchQuery} onClose={() => setPanel(null)} />}
       {panel === "ask" && ask && <AskPanel ask={ask} startWith={recapOnOpen ? "catchup" : undefined} onClose={() => { setRecapOnOpen(false); setPanel(null); }} />}
 
-      <p className={`${styles.saveNotice} ${saveFailed ? styles.saveNoticeShown : ""}`} role="status">
-        {saveFailed ? "Couldn’t save your place" : ""}
+      <p className={`${styles.saveNotice} ${saveNotice ? styles.saveNoticeShown : ""}`} role="status">
+        {saveNotice ? SAVE_NOTICE_TEXT[saveNotice] : ""}
       </p>
 
       {children}

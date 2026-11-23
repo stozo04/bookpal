@@ -193,7 +193,8 @@ export async function updateFile(
   return succeed(data as FileRow);
 }
 
-// Removes the stored book first, so a failure never leaves an orphaned object.
+// Same order as the old backend: the stored book goes first, so a failure can
+// leave a row whose file is missing but never an object nobody can find.
 export async function deleteFile(db: SupabaseClient, fileId: string): Promise<Outcome<null, "file_not_found">> {
   const { data: file, error: lookupError } = await db.from("library_files").select("id,storage_path").eq("id", fileId).maybeSingle();
   if (lookupError) return failed("look up file", lookupError);
@@ -205,6 +206,11 @@ export async function deleteFile(db: SupabaseClient, fileId: string): Promise<Ou
   const { error } = await db.from("library_files").delete().eq("id", file.id);
   if (error) return failed("delete file", error);
   return succeed(null);
+}
+
+// A clock running ahead must not pin the row: every later save would be dropped as older.
+export function placeTime(clientUpdatedAt: number | undefined, now: number): Date {
+  return new Date(Math.min(clientUpdatedAt ?? now, now));
 }
 
 export type ReadingPlace = { fileId: string; deviceId: string; progress: number; locator: unknown; at: Date };

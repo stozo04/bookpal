@@ -7,7 +7,7 @@ import { ReaderChrome } from "./ReaderChrome";
 import { webLocator } from "@/lib/locator";
 import { chapterFrameHeight } from "@/lib/chapterFrame";
 import { useReaderPrefs } from "./useReaderPrefs";
-import { postPlace, useSaveFailed } from "./useReadingPlace";
+import { usePlacePoster } from "./useReadingPlace";
 import type { AskConfig } from "./AskPanel";
 import type { SearchConfig } from "./SearchPanel";
 import type { BookConfig, ReaderMeta } from "./BookPanel";
@@ -210,14 +210,14 @@ export function EpubReader({ fileId, fingerprint, fallbackTitle, initial, meta, 
     if (f && doc) f.style.height = `${chapterFrameHeight(doc)}px`;
   }
 
-  const { saveFailed, record: recordSave } = useSaveFailed();
+  const { post: postPlace, notice: saveNotice } = usePlacePoster(fileId);
   const savePlace = useCallback((keepalive = false) => {
     const f = frame.current;
     if (!book || !f || !placeReady.current) return;
     const { index: i, fraction: fr } = latest.current;
     const locator = webLocator(fingerprint, book.spineIds[i], offsetAtTop(f), fr);
-    void postPlace(fileId, (i + fr) / book.spineLength, locator, keepalive).then(recordSave);
-  }, [book, fileId, fingerprint, recordSave]);
+    postPlace((i + fr) / book.spineLength, locator, keepalive);
+  }, [book, fingerprint, postPlace]);
 
   const scheduleSave = useCallback(() => {
     clearTimeout(saveTimer.current);
@@ -412,7 +412,7 @@ export function EpubReader({ fileId, fingerprint, fallbackTitle, initial, meta, 
       ask={ask}
       search={search}
       book={bookConfig}
-      saveFailed={saveFailed}
+      saveNotice={saveNotice}
       onPrevChapter={prev === null ? undefined : () => goTo(prev)}
       onNextChapter={next === null ? undefined : () => goTo(next)}
       contents={book.toc.map((t) => ({

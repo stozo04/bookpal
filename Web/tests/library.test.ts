@@ -10,6 +10,7 @@ import {
   startUpload,
   updateFile,
   updateFolder,
+  placeTime,
   type UploadRequest,
 } from "../src/lib/library.ts";
 
@@ -82,7 +83,7 @@ test("updateFolder maps each database error and a missing row", async () => {
   assert.deepEqual(await updateFolder(db, FOLDER, { name: "A" }), { ok: false, code: "folder_not_found" });
   assert.deepEqual(await quietly(() => updateFolder(db, FOLDER, { name: "A" })), { ok: false, code: "failed" });
   assert.equal((await updateFolder(db, FOLDER, { parentId: null })).ok, true);
-  assert.deepEqual(calls[1].steps[0], ["update", { parent_id: FOLDER }]);
+  assert.deepEqual(calls[1].steps.slice(0, 2), [["update", { parent_id: FOLDER }], ["eq", "id", FOLDER]]);
   assert.deepEqual(calls[4].steps[0], ["update", { parent_id: null }]);
 });
 
@@ -167,7 +168,8 @@ test("completeUpload marks the file ready only when the stored object matches", 
     { info: { data: { size: 1234, contentType: "application/epub+zip" } } },
   );
   assert.equal((await completeUpload(db, FILE)).ok, true);
-  assert.deepEqual(calls[1].steps[0], ["update", { status: "ready" }]);
+  assert.deepEqual(calls[0].steps[1], ["eq", "id", FILE]);
+  assert.deepEqual(calls[1].steps.slice(0, 2), [["update", { status: "ready" }], ["eq", "id", FILE]]);
 });
 
 test("completeUpload reports a missing file, a missing object and each mismatch", async () => {
@@ -194,7 +196,7 @@ test("completeUpload accepts an object whose size or type storage doesn't report
 test("updateFile renames and moves, and reports a missing file", async () => {
   const { db, calls } = fakeDb({ library_files: [{ data: { id: FILE } }, { data: null }] });
   assert.equal((await updateFile(db, FILE, { displayName: "New", folderId: null })).ok, true);
-  assert.deepEqual(calls[0].steps[0], ["update", { display_name: "New", folder_id: null }]);
+  assert.deepEqual(calls[0].steps.slice(0, 2), [["update", { display_name: "New", folder_id: null }], ["eq", "id", FILE]]);
   assert.deepEqual(await updateFile(db, FILE, { folderId: FOLDER }), { ok: false, code: "file_not_found" });
 });
 
@@ -211,12 +213,13 @@ test("deleteFile keeps the row when the stored object can't be removed", async (
   assert.equal(calls.length, 1);
 });
 
-test("saveReadingPlace upserts one row per user and book with the client's time", async () => {
+test("saveReadingPlace upserts one row per user and book, stamped with the given time", async () => {
   const { db, calls } = fakeDb({ library_files: [{ data: { id: FILE } }], reading_states: [{ data: null }] });
   const at = new Date("2026-11-23T12:00:00Z");
   const locator = { schemaVersion: 1, resourceID: "ch1" };
   const device = "44444444-4444-4444-8444-444444444444";
   assert.deepEqual(await saveReadingPlace(db, USER, { fileId: FILE, deviceId: device, progress: 0.25, locator, at }), { ok: true, value: null });
+  assert.deepEqual(calls[0].steps[1], ["eq", "id", FILE]);
   assert.deepEqual(calls[1].steps[0], [
     "upsert",
     {
@@ -240,4 +243,41 @@ test("saveReadingPlace refuses a book the user doesn't own and reports a failed 
 
   const broken = fakeDb({ library_files: [{ data: { id: FILE } }], reading_states: [{ error: { message: "down" } }] });
   assert.deepEqual(await quietly(() => saveReadingPlace(broken.db, USER, place)), { ok: false, code: "failed" });
+});
+
+test("deleteFile reports a row that couldn't be deleted after the stored book was removed", async () => {
+  const { db, storageCalls } = fakeDb({ library_files: [{ data: { id: FILE, storage_path: "p" } }, { error: { message: "down" } }] });
+  assert.deepEqual(await quietly(() => deleteFile(db, FILE)), { ok: false, code: "failed" });
+  assert.equal(storageCalls.length, 1);
+});
+
+test("startUpload fails cleanly when the lookup or the insert fails", async () => {
+  const lookup = fakeDb({ library_files: [{ error: { message: "down" } }] });
+  assert.deepEqual(await quietly(() => startUpload(lookup.db, USER, upload)), { ok: false, code: "failed" });
+  assert.equal(lookup.calls.length, 1);
+
+  const insert = fakeDb({ library_files: [{ data: null }, { error: { code: "23505" } }] });
+  assert.deepEqual(await quietly(() => startUpload(insert.db, USER, upload)), { ok: false, code: "failed" });
+  assert.equal(insert.calls.length, 2, "nothing to sign or roll back");
+});
+
+test("completeUpload reports a failed update", async () => {
+  const { db } = fakeDb(
+    { library_files: [{ data: pendingFile }, { error: { message: "down" } }] },
+    { info: { data: { size: 1234, contentType: "application/epub+zip" } } },
+  );
+  assert.deepEqual(await quietly(() => completeUpload(db, FILE)), { ok: false, code: "failed" });
+});
+
+test("folder writes report unexpected errors as failed", async () => {
+  const { db } = fakeDb({ folders: [{ error: { code: "XX000" } }, { error: { code: "XX000" } }] });
+  assert.deepEqual(await quietly(() => createFolder(db, USER, { name: "A" })), { ok: false, code: "failed" });
+  assert.deepEqual(await quietly(() => deleteFolder(db, FOLDER)), { ok: false, code: "failed" });
+});
+
+test("placeTime uses the client's moment but never one ahead of the server", () => {
+  const now = Date.parse("2026-11-23T12:00:00Z");
+  assert.equal(placeTime(now - 5000, now).getTime(), now - 5000);
+  assert.equal(placeTime(now + 60_000, now).getTime(), now);
+  assert.equal(placeTime(undefined, now).getTime(), now);
 });
