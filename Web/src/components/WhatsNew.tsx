@@ -53,7 +53,8 @@ export function WhatsNew({ version }: { version: string }) {
     closeTimer.current = setTimeout(() => setHovering(false), HOVER_CLOSE_DELAY_MS);
   };
   const onBlur = (e: React.FocusEvent) => {
-    if (!root.current?.contains(e.relatedTarget as Node | null)) setPinned(false);
+    // A click on plain text inside the panel blurs to <body> (relatedTarget null); outside clicks are handled by pointerdown.
+    if (e.relatedTarget && !root.current?.contains(e.relatedTarget as Node)) setPinned(false);
   };
 
   return (
