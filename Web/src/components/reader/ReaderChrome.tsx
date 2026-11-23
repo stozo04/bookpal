@@ -24,12 +24,14 @@ type Props = {
   ask?: AskConfig;
   search?: SearchConfig;
   book?: BookConfig;
+  /** Shown as a chevron in the top bar; omitted when there is no next chapter. */
+  onNextChapter?: () => void;
   children: React.ReactNode;
 };
 
 // The quiet frame shared by every reader: top bar, progress line, appearance
 // popover and contents drawer. The reader itself is the child.
-export function ReaderChrome({ title, subtitle, progress, hidden, contents, prefs, sizeLabel = "Size", showTypeface = true, ask, search, book, children }: Props) {
+export function ReaderChrome({ title, subtitle, progress, hidden, contents, prefs, sizeLabel = "Size", showTypeface = true, ask, search, book, onNextChapter, children }: Props) {
   const wantsCatchup = useSearchParams().get("catchup") === "1";
   const [panel, setPanel] = useState<Panel>(null);
   const [recapOnOpen, setRecapOnOpen] = useState(false);
@@ -78,6 +80,11 @@ export function ReaderChrome({ title, subtitle, progress, hidden, contents, pref
             <div className={styles.chapter}>{subtitle ?? ""}</div>
           </div>
           <div className={styles.tools}>
+            {onNextChapter && (
+              <button type="button" className={styles.icon} aria-label="Next chapter" title="Next chapter" onClick={onNextChapter}>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
+              </button>
+            )}
             {book && (
               <button type="button" className={styles.icon} aria-label="Book" aria-expanded={panel === "book"} onClick={() => setPanel(panel === "book" ? null : "book")}>
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5.5A1.5 1.5 0 0 1 6.5 4H18v14H6.5A1.5 1.5 0 0 0 5 19.5z" /><path d="M5 19.5A1.5 1.5 0 0 0 6.5 21H18v-3" /><path d="M9 8h5" /></svg>

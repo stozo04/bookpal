@@ -20,7 +20,7 @@ Use ONLY the appearance lines, notes and passages you are given. Never add detai
 2. Where the text is silent, fill in plain, believable defaults inferred from context (for example "a man in his late thirties", an ordinary build, hair and dress that suit their life, work, wealth and era). State them simply; never leave a feature "undefined" or hidden in shadow.
 3. Give a setting, light and mood that fit what the text shows about them.
 4. Describe only ${name} as a person to be painted: no relationships, no other characters, no plot or story events.
-Write ONE paragraph of 80 to 160 words describing a head-and-shoulders portrait, painterly and naturalistic. End with: "No text, no lettering, no borders."
+Write ONE paragraph of 80 to 160 words describing a photorealistic head-and-shoulders portrait photograph: natural skin texture, real-world lighting, shallow depth of field, as if shot on a full-frame camera with an 85mm lens. Never call it a painting, illustration or drawing. End with: "No text, no lettering, no borders."
 Reply with ONLY that paragraph.`;
 
 export async function POST(request: Request) {

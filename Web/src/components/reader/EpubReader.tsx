@@ -418,6 +418,7 @@ export function EpubReader({ fileId, fingerprint, fallbackTitle, initial, meta, 
       ask={ask}
       search={search}
       book={bookConfig}
+      onNextChapter={next === null ? undefined : () => goTo(next)}
       contents={book.toc.map((t) => ({
         label: t.title, depth: t.depth, current: t === currentToc, onSelect: () => goTo(t.spineIndex, t.fragment),
       }))}
