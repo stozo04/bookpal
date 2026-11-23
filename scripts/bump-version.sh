@@ -16,3 +16,4 @@ sed -i.bak -E "s/^( *MARKETING_VERSION: *)[0-9.]+/\1$next/" project.yml
 sed -i.bak -E "s/^([[:space:]]*MARKETING_VERSION = )[0-9.]+;/\1$next;/" Reader.xcodeproj/project.pbxproj
 rm project.yml.bak Reader.xcodeproj/project.pbxproj.bak
 echo "$next"
+echo "Now add $next's release notes at the top of RELEASES in Web/src/lib/releaseNotes.ts." >&2

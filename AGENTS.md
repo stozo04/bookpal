@@ -32,14 +32,19 @@
   must agree. The web app shows it in the footer.
 - Bump it only with `scripts/bump-version.sh patch|minor|major`, which writes
   every place at once. Never hand-edit a lockfile or a single file.
+- Every bump adds the version's release notes at the top of `RELEASES` in
+  `Web/src/lib/releaseNotes.ts`, with the date and one line per change
+  (`New`, `Improved`, `Fixed` or `Removed`) written for readers, not
+  developers. The footer's What's New shows them. A change with nothing to
+  show says "Behind the scenes: …".
 - Every PR that changes anything outside `.github/`, `.claude/`, `docs/`,
   top-level `.md` files and any `README.md`, `AGENTS.md` or `CLAUDE.md` bumps
   it once (Dependabot PRs included: bump them before merging), however many commits: PATCH for a fix or small
   tweak, MINOR for a new feature (resets PATCH), MAJOR only when the
   maintainer says so. If `main` moved on, re-bump above `main`'s version
   before merging.
-- CI enforces it: the "Version bumped" job in `.github/workflows/version.yml`
-  runs `scripts/check-version-bump.sh` on every PR, and on every push to
+- CI enforces both the bump and the release notes: the "Version bumped" job in
+  `.github/workflows/version.yml` runs `scripts/check-version-bump.sh` on every PR, and on every push to
   `main` against the previous `main`. It reads committed files, so commit the
   bump, then run it locally before opening a PR:
   `git fetch origin && scripts/check-version-bump.sh`. A bump also edits

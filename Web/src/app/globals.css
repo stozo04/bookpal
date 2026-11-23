@@ -3,6 +3,7 @@
   --c0: #efe9dc; --c1: #e4e8e1; --c2: #e8e1e4; --c3: #dfe5ea; --c4: #ece6d6; --c5: #e6e2ee;
   --serif: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
   --danger: #c4302b; --on-danger: #fff;
+  --kind-new: #2f8f4e; --kind-improved: #2f6fd6; --kind-fixed: #b7791f;
 }
 /* Appearance: follows the system unless the profile says light or dark (data-theme on <html>). */
 :root { color-scheme: light dark; }
@@ -12,11 +13,13 @@
   :root:not([data-theme="light"]) {
     --paper: #1d1d1f; --ink: #f2f2f2; --voice: #8a8a8c; --hairline: #3a3a3c; --wash: #242426;
     --c0: #2c2a25; --c1: #262b28; --c2: #2b2629; --c3: #252a2e; --c4: #2d2b24; --c5: #28262e;
+    --kind-new: #4cc36f; --kind-improved: #5b9bff; --kind-fixed: #e0a33e;
   }
 }
 :root[data-theme="dark"] {
     --paper: #1d1d1f; --ink: #f2f2f2; --voice: #8a8a8c; --hairline: #3a3a3c; --wash: #242426;
     --c0: #2c2a25; --c1: #262b28; --c2: #2b2629; --c3: #252a2e; --c4: #2d2b24; --c5: #28262e;
+    --kind-new: #4cc36f; --kind-improved: #5b9bff; --kind-fixed: #e0a33e;
 }
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
