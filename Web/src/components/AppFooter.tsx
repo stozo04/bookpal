@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { WhatsNew } from "./WhatsNew";
 import styles from "./AppFooter.module.css";
 
 const KEY = "bookpal:footer-collapsed";
@@ -35,7 +36,7 @@ export function AppFooter({ version }: { version: string }) {
       </button>
       <div id="footer-content" className={styles.content} hidden={collapsed}>
         <span className={`voice ${styles.brand}`}>BookPal — a private library</span>
-        <span className="voice">Your books stay yours. · v{version}</span>
+        <span className={`voice ${styles.meta}`}>Your books stay yours. · <WhatsNew version={version} /></span>
       </div>
     </footer>
   );
