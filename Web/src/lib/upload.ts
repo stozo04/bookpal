@@ -44,7 +44,7 @@ export function formatBytes(bytes: number) {
 
 // PUT the bytes to the signed URL (same request shape as supabase-js
 // uploadToSignedUrl) so we can report progress. The part's type must equal the
-// declared media type, which the backend verifies on completion.
+// declared media type, which /api/files/[id]/complete verifies.
 export function putToSignedUrl(
   signedUrl: string,
   file: File,

@@ -24,6 +24,7 @@ type Props = {
   ask?: AskConfig;
   search?: SearchConfig;
   book?: BookConfig;
+  saveFailed?: boolean;
   /** Shown as chevrons in the top bar; each is omitted when there is no chapter that way. */
   onPrevChapter?: () => void;
   onNextChapter?: () => void;
@@ -32,7 +33,7 @@ type Props = {
 
 // The quiet frame shared by every reader: top bar, progress line, appearance
 // popover and contents drawer. The reader itself is the child.
-export function ReaderChrome({ title, subtitle, progress, hidden, contents, prefs, sizeLabel = "Size", showTypeface = true, ask, search, book, onPrevChapter, onNextChapter, children }: Props) {
+export function ReaderChrome({ title, subtitle, progress, hidden, contents, prefs, sizeLabel = "Size", showTypeface = true, ask, search, book, saveFailed = false, onPrevChapter, onNextChapter, children }: Props) {
   const wantsCatchup = useSearchParams().get("catchup") === "1";
   const [panel, setPanel] = useState<Panel>(null);
   const [recapOnOpen, setRecapOnOpen] = useState(false);
@@ -177,6 +178,10 @@ export function ReaderChrome({ title, subtitle, progress, hidden, contents, pref
       {panel === "book" && book && <BookPanel book={book} onClose={() => setPanel(null)} />}
       {panel === "search" && search && <SearchPanel search={search} initialQuery={searchQuery} onQueryChange={setSearchQuery} onClose={() => setPanel(null)} />}
       {panel === "ask" && ask && <AskPanel ask={ask} startWith={recapOnOpen ? "catchup" : undefined} onClose={() => { setRecapOnOpen(false); setPanel(null); }} />}
+
+      <p className={`${styles.saveNotice} ${saveFailed ? styles.saveNoticeShown : ""}`} role="status">
+        {saveFailed ? "Couldn’t save your place" : ""}
+      </p>
 
       {children}
     </div>

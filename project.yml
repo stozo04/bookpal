@@ -43,7 +43,7 @@ targets:
         INFOPLIST_KEY_CFBundleDisplayName: "$(READER_LOCAL_DISPLAY_NAME)"
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.books
         READER_BACKEND_URL: http://127.0.0.1:3000
-        MARKETING_VERSION: 0.3.0
+        MARKETING_VERSION: 0.3.1
         CURRENT_PROJECT_VERSION: 1
         ENABLE_HARDENED_RUNTIME: YES
         CODE_SIGN_ENTITLEMENTS: Reader/Reader.entitlements

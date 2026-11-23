@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { backendFetch, getOwner, sameOrigin } from "@/lib/owner";
+import { getOwner, sameOrigin } from "@/lib/owner";
+import { updateFile } from "@/lib/library";
 
 const body = z.object({
   title: z.string().trim().min(1).max(500).optional(),
@@ -25,8 +26,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   if (!file) return fail(404, "Book not found");
 
   if (title !== undefined && title !== file.display_name) {
-    const r = await backendFetch(owner, `/v1/files/${id}`, { displayName: title }, "PATCH");
-    if (!r.ok) return fail(502, "The title couldn't be changed");
+    const renamed = await updateFile(owner.supabase, id, { displayName: title });
+    if (!renamed.ok) return fail(502, "The title couldn't be changed");
   }
   if (author !== undefined || description !== undefined) {
     const row: Record<string, unknown> = { user_id: owner.userId, file_id: id };

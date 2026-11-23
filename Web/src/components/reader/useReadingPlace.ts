@@ -16,28 +16,47 @@ function deviceId(): string {
 
 export type Place = { progress: number; resourceID: string; position: number; progression: number };
 
+// Posts the place and reports whether the server stored it.
+export async function postPlace(fileId: string, progress: number, locator: unknown, keepalive = false): Promise<boolean> {
+  try {
+    const response = await fetch(`/api/files/${fileId}/progress`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      keepalive,
+      body: JSON.stringify({ deviceId: deviceId(), progress: Math.min(1, Math.max(0, progress)), locator }),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+// True from a failed save until the next one succeeds.
+export function useSaveFailed() {
+  const [saveFailed, setSaveFailed] = useState(false);
+  const record = useCallback((saved: boolean) => setSaveFailed(!saved), []);
+  return { saveFailed, record };
+}
+
 // Saves the reading place two seconds after the reader stops moving, and when
 // the tab is hidden. The locator uses the Mac app's field names.
 export function usePlaceSaver(fileId: string, fingerprint: string) {
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const pending = useRef<Place | null>(null);
+  const { saveFailed, record } = useSaveFailed();
 
   const flush = useCallback((keepalive = false) => {
     clearTimeout(timer.current);
     const place = pending.current;
     if (!place) return;
     pending.current = null;
-    void fetch(`/api/files/${fileId}/progress`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      keepalive,
-      body: JSON.stringify({
-        deviceId: deviceId(),
-        progress: Math.min(1, Math.max(0, place.progress)),
-        locator: webLocator(fingerprint, place.resourceID, place.position, place.progression),
-      }),
-    }).catch(() => {});
-  }, [fileId, fingerprint]);
+    const locator = webLocator(fingerprint, place.resourceID, place.position, place.progression);
+    void postPlace(fileId, place.progress, locator, keepalive).then((saved) => {
+      // Keep a failed place for the next flush unless the reader has moved on.
+      if (!saved) pending.current ??= place;
+      record(saved);
+    });
+  }, [fileId, fingerprint, record]);
 
   const schedule = useCallback((place: Place) => {
     pending.current = place;
@@ -54,7 +73,7 @@ export function usePlaceSaver(fileId: string, fingerprint: string) {
     };
   }, [flush]);
 
-  return { schedule };
+  return { schedule, saveFailed };
 }
 
 // The top bar hides while reading down and returns on scroll up, near the top,

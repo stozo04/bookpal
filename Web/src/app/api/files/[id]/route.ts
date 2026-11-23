@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { backendFetch, getOwner, sameOrigin } from "@/lib/owner";
+import { getOwner, sameOrigin } from "@/lib/owner";
+import { deleteFile, updateFile } from "@/lib/library";
 import { isPortraitKey, portraitFolder, portraitPath } from "@/lib/portrait";
 import { BUCKET } from "@/lib/storedJpeg";
 
@@ -21,9 +22,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const parsed = change.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return fail(400, "invalid_request", "Nothing to change");
 
-  const response = await backendFetch(owner, `/v1/files/${id}`, parsed.data, "PATCH");
-  if (response.status === 404) return fail(404, "not_found", "Book not found");
-  if (!response.ok) return fail(502, "backend_error", "The change couldn't be saved");
+  const updated = await updateFile(owner.supabase, id, parsed.data);
+  if (!updated.ok && updated.code === "file_not_found") return fail(404, "not_found", "Book not found");
+  if (!updated.ok) return fail(502, "save_failed", "The change couldn't be saved");
   return new NextResponse(null, { status: 204 });
 }
 
@@ -34,10 +35,9 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   const { id } = await params;
   if (!validId(id)) return fail(400, "invalid_request", "Invalid file");
 
-  const response = await backendFetch(owner, `/v1/files/${id}`, undefined, "DELETE");
-  if (response.status === 404) return fail(404, "not_found", "Book not found");
-  if (!response.ok) return fail(502, "backend_error", "The book couldn't be removed");
-  // The backend removes the book itself; the custom cover and portraits are ours to clean up.
+  const deleted = await deleteFile(owner.supabase, id);
+  if (!deleted.ok && deleted.code === "file_not_found") return fail(404, "not_found", "Book not found");
+  if (!deleted.ok) return fail(502, "delete_failed", "The book couldn't be removed");
   const storage = owner.supabase.storage.from(BUCKET);
   const { data: portraits } = await storage.list(portraitFolder(owner.userId, id), { limit: 1000 });
   await storage.remove([

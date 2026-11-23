@@ -93,7 +93,7 @@ export function PdfReader({ fileId, fingerprint, title, byteSize, initial, meta,
   const { notes, saveSummary, saveCast, saveProfile, saveWord, saveRecap } = useNotes(fileId, savedNotes);
   const prefs = useReaderPrefs("zoom");
   const { hidden, setHidden, onScrollY, settle } = useAutoHideBar();
-  const { schedule } = usePlaceSaver(fileId, fingerprint);
+  const { schedule, saveFailed } = usePlaceSaver(fileId, fingerprint);
   const [phase, setPhase] = useState<"loading" | "ready" | "error" | "locked">("loading");
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
   const [outline, setOutline] = useState<OutlineNode[]>([]);
@@ -312,7 +312,7 @@ export function PdfReader({ fileId, fingerprint, title, byteSize, initial, meta,
   return (
     <ReaderChrome
       title={title} subtitle={`Page ${current + 1} of ${pdf.numPages}`} progress={progress} hidden={hidden}
-      prefs={prefs} sizeLabel="Zoom" showTypeface={false} contents={outline.length ? flatten(outline) : null} ask={ask} search={search} book={bookConfig}
+      prefs={prefs} sizeLabel="Zoom" showTypeface={false} contents={outline.length ? flatten(outline) : null} ask={ask} search={search} book={bookConfig} saveFailed={saveFailed}
     >
       <main ref={main} className={styles.main} onClick={() => !window.getSelection()?.toString() && setHidden((h) => !h)}>
         <div ref={list} className={styles.list}>

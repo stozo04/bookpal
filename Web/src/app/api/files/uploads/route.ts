@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { backendFetch, getOwner, sameOrigin } from "@/lib/owner";
+import { getOwner, sameOrigin } from "@/lib/owner";
+import { startUpload } from "@/lib/library";
 
 const body = z.object({
   clientFileId: z.string().uuid(),
@@ -24,8 +25,8 @@ export async function POST(request: Request) {
   if (!parsed.success) return fail(400, "invalid_request", "That file couldn't be read");
   const input = parsed.data;
 
-  // The database has a unique (user, sha256) index, which the backend reports as
-  // a generic 500, so detect repeats here. RLS limits this lookup to the user.
+  // The database has a unique (user, sha256) index, so a repeat would fail the
+  // insert; detect it here instead. RLS limits this lookup to the user.
   const { data: existing } = await owner.supabase
     .from("library_files")
     .select("id, status")
@@ -36,12 +37,11 @@ export async function POST(request: Request) {
   // An earlier attempt left an unfinished row: resume it instead of colliding.
   const clientFileId = existing?.id ?? input.clientFileId;
 
-  const response = await backendFetch(owner, "/v1/files/uploads", { ...input, clientFileId });
-  const payload = await response.json().catch(() => null);
-  if (!response.ok) return fail(response.status === 409 ? 409 : 502, payload?.error?.code ?? "backend_error", "The upload couldn't be started");
+  const started = await startUpload(owner.supabase, owner.userId, { ...input, clientFileId });
+  if (!started.ok) return fail(started.code === "failed" ? 502 : 409, started.code, "The upload couldn't be started");
   return NextResponse.json({
-    duplicate: payload.needsUpload === false,
-    fileId: payload.file.id,
-    upload: payload.upload,
+    duplicate: !started.value.needsUpload,
+    fileId: started.value.file.id,
+    upload: started.value.upload,
   });
 }

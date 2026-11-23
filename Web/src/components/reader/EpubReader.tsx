@@ -7,6 +7,7 @@ import { ReaderChrome } from "./ReaderChrome";
 import { webLocator } from "@/lib/locator";
 import { chapterFrameHeight } from "@/lib/chapterFrame";
 import { useReaderPrefs } from "./useReaderPrefs";
+import { postPlace, useSaveFailed } from "./useReadingPlace";
 import type { AskConfig } from "./AskPanel";
 import type { SearchConfig } from "./SearchPanel";
 import type { BookConfig, ReaderMeta } from "./BookPanel";
@@ -93,18 +94,6 @@ function scrollToOffset(frame: HTMLIFrameElement, offset: number) {
       return;
     }
     acc += node.data.length;
-  }
-}
-
-function deviceId(): string {
-  try {
-    const saved = localStorage.getItem("bookpal:device-id");
-    if (saved) return saved;
-    const fresh = crypto.randomUUID();
-    localStorage.setItem("bookpal:device-id", fresh);
-    return fresh;
-  } catch {
-    return crypto.randomUUID();
   }
 }
 
@@ -221,21 +210,14 @@ export function EpubReader({ fileId, fingerprint, fallbackTitle, initial, meta, 
     if (f && doc) f.style.height = `${chapterFrameHeight(doc)}px`;
   }
 
+  const { saveFailed, record: recordSave } = useSaveFailed();
   const savePlace = useCallback((keepalive = false) => {
     const f = frame.current;
     if (!book || !f || !placeReady.current) return;
     const { index: i, fraction: fr } = latest.current;
-    void fetch(`/api/files/${fileId}/progress`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      keepalive,
-      body: JSON.stringify({
-        deviceId: deviceId(),
-        progress: Math.min(1, (i + fr) / book.spineLength),
-        locator: webLocator(fingerprint, book.spineIds[i], offsetAtTop(f), fr),
-      }),
-    }).catch(() => {});
-  }, [book, fileId, fingerprint]);
+    const locator = webLocator(fingerprint, book.spineIds[i], offsetAtTop(f), fr);
+    void postPlace(fileId, (i + fr) / book.spineLength, locator, keepalive).then(recordSave);
+  }, [book, fileId, fingerprint, recordSave]);
 
   const scheduleSave = useCallback(() => {
     clearTimeout(saveTimer.current);
@@ -430,6 +412,7 @@ export function EpubReader({ fileId, fingerprint, fallbackTitle, initial, meta, 
       ask={ask}
       search={search}
       book={bookConfig}
+      saveFailed={saveFailed}
       onPrevChapter={prev === null ? undefined : () => goTo(prev)}
       onNextChapter={next === null ? undefined : () => goTo(next)}
       contents={book.toc.map((t) => ({
