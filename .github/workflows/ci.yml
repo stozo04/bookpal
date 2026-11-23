@@ -31,7 +31,15 @@ jobs:
             backend=true
             macos=true
           else
-            files=$(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[] | .filename, (.previous_filename // empty)')
+            # A version bump (scripts/bump-version.sh) touches the backend and Xcode files on every
+            # shipping PR; those version-only edits must not start the backend and macOS jobs.
+            files=$(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '
+              .[]
+              | select(
+                  (.filename | IN("project.yml", "Reader.xcodeproj/project.pbxproj", "Backend/package.json", "Backend/package-lock.json"))
+                  and ((.patch // "") | split("\n") | map(select(test("^[+-]"))) | length > 0 and all(test("MARKETING_VERSION|\"version\":")))
+                  | not)
+              | .filename, (.previous_filename // empty)')
             while IFS= read -r f; do
               [ -z "$f" ] && continue
               case "$f" in
