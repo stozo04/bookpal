@@ -50,7 +50,8 @@ export function ReaderChrome({ title, subtitle, progress, hidden, contents, pref
 
   useEffect(() => {
     if (!panel) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setPanel(null);
+    // A modal dialog open over the panel takes Escape for itself.
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !document.querySelector("dialog[open]") && setPanel(null);
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [panel]);

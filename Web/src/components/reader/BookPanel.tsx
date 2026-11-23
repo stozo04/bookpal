@@ -1,7 +1,9 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { BookEditor } from "../BookEditor";
+import { Dialog } from "../Dialog";
+import forms from "../FolderForms.module.css";
 import { readMeta } from "@/lib/covers";
 import { GRAPH_H, GRAPH_W, initials, layout, type Character } from "@/lib/castgraph";
 import { gatherAppearance, gatherMentions, nameVariants } from "@/lib/mentions";
@@ -38,7 +40,7 @@ export function BookPanel({ book, onClose }: { book: BookConfig; onClose: () => 
   const [embeddedUrl, setEmbeddedUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !editing && onClose();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !editing && !document.querySelector("dialog[open]") && onClose();
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose, editing]);
@@ -172,6 +174,9 @@ function CastView({ book }: { book: BookConfig }) {
   };
 
   const graph = useMemo(() => (cast ? layout(cast.characters) : null), [cast]);
+  const names = useMemo(() => cast?.characters.map((c) => c.name) ?? [], [cast]);
+  const portraits = usePortraits(info.fileId, names);
+  const clipId = useId();
   const chosen = cast?.characters.find((c) => c.name === selected) ?? null;
   // Labels on the lines only when there are few enough to read; the card lists them all.
   const quiet = chosen ? (graph?.edges.filter((e) => e.a === chosen.name || e.b === chosen.name).length ?? 0) <= 4 : true;
@@ -187,7 +192,7 @@ function CastView({ book }: { book: BookConfig }) {
 
   if (cast && profileOf) {
     const who = cast.characters.find((c) => c.name === profileOf);
-    if (who) return <ProfileView book={book} character={who} cast={cast.characters} onBack={() => setProfileOf(null)} onOpen={(n) => { setProfileOf(null); setSelected(n); }} />;
+    if (who) return <ProfileView book={book} character={who} cast={cast.characters} portrait={portraits.forName(who.name)} onBack={() => setProfileOf(null)} onOpen={(n) => { setProfileOf(null); setSelected(n); }} />;
   }
 
   if (!cast) {
@@ -238,8 +243,9 @@ function CastView({ book }: { book: BookConfig }) {
               </g>
             );
           })}
-          {graph.nodes.map((n) => {
+          {graph.nodes.map((n, i) => {
             const c = cast.characters.find((x) => x.name === n.name)!;
+            const photo = portraits.urlOf(n.name);
             const r = 14 + Math.min(n.degree, 5) * 1.6;
             const faded = chosen && !related.has(n.name);
             return (
@@ -248,7 +254,14 @@ function CastView({ book }: { book: BookConfig }) {
                 onClick={() => setSelected(selected === n.name ? null : n.name)}
                 onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), setSelected(selected === n.name ? null : n.name))}>
                 <circle r={r} />
-                <text className={styles.ini} textAnchor="middle" dy="0.35em">{initials(n.name)}</text>
+                {photo ? (
+                  <>
+                    <clipPath id={`${clipId}-${i}`}><circle r={r - 1} /></clipPath>
+                    <image href={photo} x={-r} y={-r} width={r * 2} height={r * 2} preserveAspectRatio="xMidYMin slice" clipPath={`url(#${clipId}-${i})`} />
+                  </>
+                ) : (
+                  <text className={styles.ini} textAnchor="middle" dy="0.35em">{initials(n.name)}</text>
+                )}
                 <text className={styles.label} textAnchor="middle" y={r + 11}>{n.name.split(" ")[0]}</text>
               </g>
             );
@@ -276,7 +289,10 @@ function CastView({ book }: { book: BookConfig }) {
         {cast.characters.map((c) => (
           <li key={c.name}>
             <button type="button" aria-pressed={selected === c.name} onClick={() => setSelected(selected === c.name ? null : c.name)}>
-              <span className={styles.badge} aria-hidden="true">{initials(c.name)}</span>
+              {portraits.urlOf(c.name)
+                // eslint-disable-next-line @next/next/no-img-element
+                ? <img className={styles.badge} src={portraits.urlOf(c.name)!} alt="" />
+                : <span className={styles.badge} aria-hidden="true">{initials(c.name)}</span>}
               <span className={styles.who}>
                 <span className={styles.whoName}>{c.name}</span>
                 <span className={styles.whoRole}>{c.role || c.description.slice(0, 60)}</span>
@@ -301,11 +317,11 @@ async function passagesAbout(book: BookConfig, character: Character, cast: Chara
 
 // Everything the story has shown about one person, built once from every passage that
 // mentions them and then saved.
-function ProfileView({ book, character, cast, onBack, onOpen }: {
-  book: BookConfig; character: Character; cast: Character[]; onBack: () => void; onOpen: (name: string) => void;
+function ProfileView({ book, character, cast, portrait, onBack, onOpen }: {
+  book: BookConfig; character: Character; cast: Character[]; portrait: Portrait; onBack: () => void; onOpen: (name: string) => void;
 }) {
   const saved = book.notes.profiles[character.name];
-  const portrait = usePortrait(book.info.fileId, character.name);
+  const [removing, setRemoving] = useState(false);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -355,9 +371,10 @@ function ProfileView({ book, character, cast, onBack, onOpen }: {
           <h2 className={styles.profileName}>{character.name}</h2>
           {character.role && <div className={styles.aka}>{character.role}</div>}
           {character.aliases.length > 0 && <div className={styles.aka}>Also called {character.aliases.join(", ")}</div>}
-          {portrait.url && <button type="button" className={styles.quiet} onClick={() => void portrait.remove()}>Remove portrait</button>}
+          {portrait.url && <button type="button" className={styles.quiet} onClick={() => setRemoving(true)}>Remove portrait</button>}
         </div>
       </div>
+      <RemovePortraitDialog open={removing} name={character.name} onClose={() => setRemoving(false)} remove={portrait.remove} />
       {portrait.ready && !portrait.url && (
         <PortraitMaker book={book} character={character} cast={cast} onSave={portrait.save}
           known={saved && notAhead(saved.progress, book.getProgress()) ? saved.profile : undefined} />
@@ -417,40 +434,94 @@ function ProfileView({ book, character, cast, onBack, onOpen }: {
 type SavedPortrait = { key: string; version: string };
 
 // The saved portrait for one character, if there is one.
-function usePortrait(fileId: string, name: string) {
-  const [key, setKey] = useState<string | null>(null);
-  const [url, setUrl] = useState<string | null>(null);
-  const [ready, setReady] = useState(false);
+type Portrait = {
+  url: string | null;
+  ready: boolean;
+  save: (picture: Blob) => Promise<string | null>;
+  remove: () => Promise<string | null>;
+};
+
+// Every saved portrait in the book, shared by the web, the cast list and the profile so a
+// change in one shows in all of them.
+function usePortraits(fileId: string, names: string[]) {
+  const [versions, setVersions] = useState<Record<string, string> | null>(null); // by key
+  const [keys, setKeys] = useState<Record<string, string>>({}); // by name
+  const nameList = names.join("\n");
+
   useEffect(() => {
     let live = true;
-    setReady(false);
-    setUrl(null);
-    void (async () => {
-      const wanted = await portraitKey(name);
-      const r = await fetch(`/api/files/${fileId}/portraits`, { cache: "no-store" }).catch(() => null);
-      const saved: SavedPortrait[] = r?.ok ? (await r.json()).portraits : [];
-      const found = saved.find((s) => s.key === wanted);
-      if (!live) return;
-      setKey(wanted);
-      setUrl(found ? `/api/files/${fileId}/portraits/${wanted}?v=${encodeURIComponent(found.version)}` : null);
-      setReady(Boolean(r?.ok));
-    })();
+    void fetch(`/api/files/${fileId}/portraits`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((d: { portraits: SavedPortrait[] }) => live && setVersions(Object.fromEntries(d.portraits.map((p) => [p.key, p.version]))))
+      .catch(() => {});
     return () => { live = false; };
-  }, [fileId, name]);
+  }, [fileId]);
 
-  const save = async (picture: Blob): Promise<string | null> => {
-    if (!key) return "The portrait couldn’t be saved.";
-    const r = await fetch(`/api/files/${fileId}/portraits/${key}`, { method: "PUT", headers: { "content-type": "image/jpeg" }, body: picture }).catch(() => null);
-    if (!r?.ok) return (await r?.json().catch(() => null))?.error?.message ?? "The portrait couldn’t be saved.";
-    setUrl(`/api/files/${fileId}/portraits/${key}?v=${Date.now()}`);
-    return null;
+  useEffect(() => {
+    let live = true;
+    const list = nameList ? nameList.split("\n") : [];
+    void Promise.all(list.map(async (n) => [n, await portraitKey(n)] as const)).then((pairs) => live && setKeys(Object.fromEntries(pairs)));
+    return () => { live = false; };
+  }, [nameList]);
+
+  const pathOf = (key: string) => `/api/files/${fileId}/portraits/${key}`;
+  const urlOf = (name: string): string | null => {
+    const key = keys[name];
+    const version = key ? versions?.[key] : undefined;
+    return key && version !== undefined ? `${pathOf(key)}?v=${encodeURIComponent(version)}` : null;
   };
-  const remove = async () => {
-    if (!key || !window.confirm(`Remove the portrait of ${name}?`)) return;
-    const r = await fetch(`/api/files/${fileId}/portraits/${key}`, { method: "DELETE" }).catch(() => null);
-    if (r?.ok) setUrl(null);
+
+  const forName = (name: string): Portrait => {
+    const key = keys[name];
+    return {
+      url: urlOf(name),
+      ready: versions !== null && Boolean(key),
+      save: async (picture) => {
+        if (!key) return "The portrait couldn’t be saved.";
+        const r = await fetch(pathOf(key), { method: "PUT", headers: { "content-type": "image/jpeg" }, body: picture }).catch(() => null);
+        if (!r?.ok) return (await r?.json().catch(() => null))?.error?.message ?? "The portrait couldn’t be saved.";
+        setVersions((v) => ({ ...v, [key]: String(Date.now()) }));
+        return null;
+      },
+      remove: async () => {
+        if (!key) return "The portrait couldn’t be removed.";
+        const r = await fetch(pathOf(key), { method: "DELETE" }).catch(() => null);
+        if (!r?.ok) return (await r?.json().catch(() => null))?.error?.message ?? "The portrait couldn’t be removed.";
+        setVersions((v) => {
+          const next = { ...v };
+          delete next[key];
+          return next;
+        });
+        return null;
+      },
+    };
   };
-  return { url, ready, save, remove };
+  return { urlOf, forName };
+}
+
+function RemovePortraitDialog({ open, name, onClose, remove }: {
+  open: boolean; name: string; onClose: () => void; remove: () => Promise<string | null>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const close = () => { setError(""); onClose(); };
+  const confirm = async () => {
+    setBusy(true);
+    const problem = await remove();
+    setBusy(false);
+    if (problem) setError(problem);
+    else close();
+  };
+  return (
+    <Dialog open={open} title="Remove this portrait?" onClose={close}>
+      <p className="voice">The picture of {name} will be deleted. You can write a new prompt and add another afterwards.</p>
+      {error && <p className={forms.error} role="alert">{error}</p>}
+      <div className={forms.actions}>
+        <button type="button" onClick={close}>Cancel</button>
+        <button type="button" className="danger" disabled={busy} onClick={() => void confirm()}>{busy ? "Removing…" : "Remove"}</button>
+      </div>
+    </Dialog>
+  );
 }
 
 const PORTRAIT_WIDTH = 640;

@@ -99,7 +99,7 @@ export function BookMenu({ id, title, folders = [], folderId = null, author = ""
           {error && <p className={styles.error} role="alert">{error}</p>}
           <div className={styles.actions}>
             <button type="button" onClick={() => setMode(null)}>Cancel</button>
-            <button type="submit" disabled={busy || (mode === "rename" ? !name.trim() || name.trim() === title : typed !== "DELETE")}>
+            <button type="submit" className={mode === "delete" ? "danger" : undefined} disabled={busy || (mode === "rename" ? !name.trim() || name.trim() === title : typed !== "DELETE")}>
               {busy ? "Working…" : mode === "rename" ? "Save" : "Remove"}
             </button>
           </div>

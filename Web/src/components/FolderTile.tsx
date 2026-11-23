@@ -64,7 +64,7 @@ export function FolderTile({ folder, items, folders }: { folder: Folder; items: 
         {error && <p className={forms.error} role="alert">{error}</p>}
         <div className={forms.actions}>
           <button type="button" onClick={() => setMode(null)}>Cancel</button>
-          <button type="button" disabled={busy} onClick={async () => { setBusy(true); const p = await api.deleteFolder(folder.id); setBusy(false); if (p) setError(p); else done(); }}>
+          <button type="button" className="danger" disabled={busy} onClick={async () => { setBusy(true); const p = await api.deleteFolder(folder.id); setBusy(false); if (p) setError(p); else done(); }}>
             {busy ? "Working…" : "Delete"}
           </button>
         </div>

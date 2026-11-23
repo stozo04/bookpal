@@ -37,6 +37,8 @@
 .node.picked .ini { fill: var(--bg); }
 .node.dim { opacity: .28; }
 .ini { font: 11px Georgia, serif; fill: var(--ink); pointer-events: none; }
+.node image { pointer-events: none; }
+img.badge { object-fit: cover; object-position: 50% 20%; padding: 0; }
 .label { font: 10px system-ui, sans-serif; fill: var(--ink); paint-order: stroke; stroke: var(--bg); stroke-width: 3px; pointer-events: none; }
 .detail { border: 1px solid var(--hairline); border-radius: 12px; padding: 14px 16px; margin: 6px 0 14px; background: color-mix(in srgb, var(--ink) 3%, transparent); animation: fade .3s ease-out; }
 .detailName { font: 19px Georgia, serif; }
