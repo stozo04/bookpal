@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { chapterFrameHeight } from "../src/lib/chapterFrame.ts";
+import { CHAPTER_CSS } from "../src/components/reader/themes.ts";
 
 // Heights measured in a real chapter after its text was made larger and then back to
 // normal; scrollHeight is what the old sizing read and stayed stuck at the larger value.
@@ -19,4 +20,10 @@ test("the frame grows to the chapter when its text gets longer", () => {
 
 test("a fractional chapter height rounds up so the last line is never clipped", () => {
   assert.equal(chapterFrameHeight(shrunkChapter(5021.48, 0)), 5022);
+});
+
+// Books float figures with HTML align, which survives sanitizing. Without flow-root they
+// hang below the body's height and the frame (scrolling="no") cuts them off.
+test("the chapter body contains floated figures", () => {
+  assert.match(CHAPTER_CSS, /\nbody \{ display: flow-root;/);
 });

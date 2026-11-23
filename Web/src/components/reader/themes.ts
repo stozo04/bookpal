@@ -32,7 +32,7 @@ export function themeVars(theme: ThemeName, size: number, face: Face): Record<st
 export const CHAPTER_CSS = `
 :root { color-scheme: light dark; }
 html { background: var(--bg); }
-body { margin: 0; background: var(--bg); color: var(--ink); font: var(--fs)/1.7 var(--face); -webkit-font-smoothing: antialiased; hyphens: auto; overflow-wrap: break-word; }
+body { display: flow-root; margin: 0; background: var(--bg); color: var(--ink); font: var(--fs)/1.7 var(--face); -webkit-font-smoothing: antialiased; hyphens: auto; overflow-wrap: break-word; }
 article { max-width: 35em; margin: 0 auto; padding: 96px 28px 72px; }
 p { margin: 0 0 1em; }
 h1, h2, h3, h4 { font-weight: 300; line-height: 1.25; letter-spacing: -0.01em; margin: 1.6em 0 .6em; }
