@@ -856,7 +856,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.1.0;
+				MARKETING_VERSION = 0.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(READER_LOCAL_BUNDLE_IDENTIFIER)";
 				PRODUCT_MODULE_NAME = Reader;
 				PRODUCT_NAME = "$(READER_LOCAL_PRODUCT_NAME)";
@@ -885,7 +885,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.1.0;
+				MARKETING_VERSION = 0.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(READER_LOCAL_BUNDLE_IDENTIFIER)";
 				PRODUCT_MODULE_NAME = Reader;
 				PRODUCT_NAME = "$(READER_LOCAL_PRODUCT_NAME)";

@@ -23,6 +23,25 @@
   agent-specific state. Put private preferences in the agent's global or local
   configuration instead.
 
+## Versioning (every PR that touches the product)
+
+- BookPal has one product version (semantic versioning, `MAJOR.MINOR.PATCH`)
+  shared by the Mac app, the web app and the backend. It is written in
+  `Web/package.json`, `Backend/package.json`, their lockfiles, and
+  `MARKETING_VERSION` in `project.yml` and `Reader.xcodeproj`, and all of them
+  must agree. The web app shows it in the footer.
+- Bump it only with `scripts/bump-version.sh patch|minor|major`, which writes
+  every place at once. Never hand-edit a lockfile or a single file.
+- Every PR that changes anything outside `.github/`, `.claude/`, `docs/` and
+  `.md` files bumps it once, however many commits: PATCH for a fix or small
+  tweak, MINOR for a new feature (resets PATCH), MAJOR only when the
+  maintainer says so. If `main` moved on, re-bump above `main`'s version
+  before merging.
+- CI enforces it: the "Version bumped" job in `.github/workflows/version.yml`
+  runs `scripts/check-version-bump.sh`. Run it locally before opening a PR:
+  `git fetch origin && scripts/check-version-bump.sh`.
+- Releases are tags on `main`; see `RELEASING.md`.
+
 ## Apple platform direction
 
 This is a macOS-first product, not a macOS-only product.

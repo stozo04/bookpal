@@ -4,6 +4,7 @@ import { isAllowed } from "@/lib/allowlist";
 import { AppHeader } from "@/components/AppHeader";
 import { AppFooter } from "@/components/AppFooter";
 import { AppearanceSync } from "@/components/AppearanceSync";
+import packageJson from "../../../package.json";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -25,7 +26,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <AppearanceSync value={appearance} />
       <AppHeader name={name} email={user.email ?? ""} avatarUrl={avatarUrl} />
       <div className="shell-body">{children}</div>
-      <AppFooter />
+      <AppFooter version={packageJson.version} />
     </div>
   );
 }
