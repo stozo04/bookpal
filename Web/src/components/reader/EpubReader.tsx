@@ -5,6 +5,7 @@ import { openEpub, type Chapter, type EpubBook } from "@/lib/epub";
 import { CHAPTER_CSS, themeVars } from "./themes";
 import { ReaderChrome } from "./ReaderChrome";
 import { webLocator } from "@/lib/locator";
+import { chapterFrameHeight } from "@/lib/chapterFrame";
 import { useReaderPrefs } from "./useReaderPrefs";
 import type { AskConfig } from "./AskPanel";
 import type { SearchConfig } from "./SearchPanel";
@@ -217,7 +218,7 @@ export function EpubReader({ fileId, fingerprint, fallbackTitle, initial, meta, 
   function fit() {
     const f = frame.current;
     const doc = f?.contentDocument;
-    if (f && doc) f.style.height = `${doc.documentElement.scrollHeight}px`;
+    if (f && doc) f.style.height = `${chapterFrameHeight(doc)}px`;
   }
 
   const savePlace = useCallback((keepalive = false) => {
