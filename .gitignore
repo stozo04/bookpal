@@ -28,6 +28,11 @@ CLAUDE.local.md
 .claude/settings.local.json
 .codex/
 
+# Credentials
+client_secret*.json
+*.key
+*.pem
+
 # Reproducible public-domain test corpus downloads
 TestCorpus/Downloads/
 Backend/.catalog-state/
