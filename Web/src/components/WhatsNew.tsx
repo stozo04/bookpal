@@ -53,8 +53,7 @@ export function WhatsNew({ version }: { version: string }) {
     closeTimer.current = setTimeout(() => setHovering(false), HOVER_CLOSE_DELAY_MS);
   };
   const onBlur = (e: React.FocusEvent) => {
-    // A click on plain text inside the panel blurs to <body> (relatedTarget null); outside clicks are handled by pointerdown.
-    if (e.relatedTarget && !root.current?.contains(e.relatedTarget as Node)) setPinned(false);
+    if (!root.current?.contains(e.relatedTarget as Node | null)) setPinned(false);
   };
 
   return (
@@ -71,7 +70,12 @@ export function WhatsNew({ version }: { version: string }) {
         v{version}
       </button>
       {open && (
-        <section id={panelId} className={styles.panel} aria-labelledby={`${panelId}-title`}>
+        // The scrim only shows on phones, where it takes the dismissing tap so it can't open what lies beneath.
+        <div className={styles.scrim} onClick={close} aria-hidden="true" />
+      )}
+      {open && (
+        // tabIndex -1 keeps focus inside when plain text in the panel is clicked, so blur means focus really left.
+        <section id={panelId} className={styles.panel} tabIndex={-1} aria-labelledby={`${panelId}-title`}>
           <h2 id={`${panelId}-title`} className={styles.title}>What’s New</h2>
           <div className={styles.list} tabIndex={0} aria-label="Release history">
             {RELEASES.map((release) => (
