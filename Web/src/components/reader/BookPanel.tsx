@@ -6,6 +6,8 @@ import { readMeta } from "@/lib/covers";
 import { GRAPH_H, GRAPH_W, initials, layout, type Character } from "@/lib/castgraph";
 import { gatherMentions, nameVariants } from "@/lib/mentions";
 import { atThisPlace, type Profile, type ReaderNotes } from "@/lib/notes";
+import { pictureToCover } from "@/lib/images";
+import { portraitKey } from "@/lib/portrait";
 import { useRouter } from "next/navigation";
 import { readEvents } from "@/lib/sse";
 import styles from "./BookPanel.module.css";
@@ -287,12 +289,22 @@ function CastView({ book }: { book: BookConfig }) {
   );
 }
 
+// Every passage so far that mentions one person, for the AI notes written about them.
+async function passagesAbout(book: BookConfig, character: Character, cast: Character[], setStatus: (m: string) => void) {
+  setStatus("Gathering what you’ve read…");
+  const { text, label } = await book.getTextSoFar((m) => setStatus(m));
+  setStatus(`Finding every place ${character.name.split(" ")[0]} appears…`);
+  const others = cast.filter((c) => c.name !== character.name).map((c) => c.name);
+  return { passages: gatherMentions(text, nameVariants(character.name, character.aliases, others)), label, others };
+}
+
 // Everything the story has shown about one person, built once from every passage that
 // mentions them and then saved.
 function ProfileView({ book, character, cast, onBack, onOpen }: {
   book: BookConfig; character: Character; cast: Character[]; onBack: () => void; onOpen: (name: string) => void;
 }) {
   const saved = book.notes.profiles[character.name];
+  const portrait = usePortrait(book.info.fileId, character.name);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -301,12 +313,8 @@ function ProfileView({ book, character, cast, onBack, onOpen }: {
     setBusy(true);
     setError("");
     try {
-      setStatus("Gathering what you’ve read…");
       const startedAt = book.getProgress();
-      const { text, label } = await book.getTextSoFar((m) => setStatus(m));
-      setStatus(`Finding every place ${character.name.split(" ")[0]} appears…`);
-      const others = cast.filter((c) => c.name !== character.name).map((c) => c.name);
-      const passages = gatherMentions(text, nameVariants(character.name, character.aliases, others));
+      const { passages, label, others } = await passagesAbout(book, character, cast, setStatus);
       if (passages.length < 40) { setError(`${character.name} hasn’t appeared enough yet for a profile.`); return; }
       setStatus(`Writing about ${character.name.split(" ")[0]}…`);
       const r = await fetch("/api/ai/character", {
@@ -338,13 +346,18 @@ function ProfileView({ book, character, cast, onBack, onOpen }: {
     <div className={styles.body}>
       <button type="button" className={styles.back} onClick={onBack}><span aria-hidden="true">←</span> All characters</button>
       <div className={styles.profileHead}>
-        <span className={styles.bigBadge} aria-hidden="true">{initials(character.name)}</span>
+        {portrait.url
+          // eslint-disable-next-line @next/next/no-img-element
+          ? <img className={styles.portrait} src={portrait.url} alt={`Portrait of ${character.name}`} />
+          : <span className={styles.bigBadge} aria-hidden="true">{initials(character.name)}</span>}
         <div>
           <h2 className={styles.profileName}>{character.name}</h2>
           {character.role && <div className={styles.aka}>{character.role}</div>}
           {character.aliases.length > 0 && <div className={styles.aka}>Also called {character.aliases.join(", ")}</div>}
+          {portrait.url && <button type="button" className={styles.quiet} onClick={() => void portrait.remove()}>Remove portrait</button>}
         </div>
       </div>
+      {portrait.ready && !portrait.url && <PortraitMaker book={book} character={character} cast={cast} onSave={portrait.save} />}
 
       {!p ? (
         <div>
@@ -394,5 +407,141 @@ function ProfileView({ book, character, cast, onBack, onOpen }: {
         </article>
       )}
     </div>
+  );
+}
+
+type SavedPortrait = { key: string; version: string };
+
+// The saved portrait for one character, if there is one.
+function usePortrait(fileId: string, name: string) {
+  const [key, setKey] = useState<string | null>(null);
+  const [url, setUrl] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    let live = true;
+    setReady(false);
+    setUrl(null);
+    void (async () => {
+      const wanted = await portraitKey(name);
+      const r = await fetch(`/api/files/${fileId}/portraits`, { cache: "no-store" }).catch(() => null);
+      const saved: SavedPortrait[] = r?.ok ? (await r.json()).portraits : [];
+      const found = saved.find((s) => s.key === wanted);
+      if (!live) return;
+      setKey(wanted);
+      setUrl(found ? `/api/files/${fileId}/portraits/${wanted}?v=${encodeURIComponent(found.version)}` : null);
+      setReady(Boolean(r?.ok));
+    })();
+    return () => { live = false; };
+  }, [fileId, name]);
+
+  const save = async (picture: Blob): Promise<string | null> => {
+    if (!key) return "The portrait couldn’t be saved.";
+    const r = await fetch(`/api/files/${fileId}/portraits/${key}`, { method: "PUT", headers: { "content-type": "image/jpeg" }, body: picture }).catch(() => null);
+    if (!r?.ok) return (await r?.json().catch(() => null))?.error?.message ?? "The portrait couldn’t be saved.";
+    setUrl(`/api/files/${fileId}/portraits/${key}?v=${Date.now()}`);
+    return null;
+  };
+  const remove = async () => {
+    if (!key || !window.confirm(`Remove the portrait of ${name}?`)) return;
+    const r = await fetch(`/api/files/${fileId}/portraits/${key}`, { method: "DELETE" }).catch(() => null);
+    if (r?.ok) setUrl(null);
+  };
+  return { url, ready, save, remove };
+}
+
+const PORTRAIT_WIDTH = 640;
+
+// No picture yet: write a prompt from the book to paste into ChatGPT, then take the
+// picture it makes (chosen, dropped or pasted) and save it.
+function PortraitMaker({ book, character, cast, onSave }: {
+  book: BookConfig; character: Character; cast: Character[]; onSave: (picture: Blob) => Promise<string | null>;
+}) {
+  const [prompt, setPrompt] = useState("");
+  const [status, setStatus] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState<null | "writing" | "saving">(null);
+  const [copied, setCopied] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const first = character.name.split(" ")[0];
+
+  const write = async () => {
+    setBusy("writing");
+    setError("");
+    try {
+      const { passages } = await passagesAbout(book, character, cast, setStatus);
+      if (passages.length < 40) { setError(`${character.name} hasn’t appeared enough yet to describe.`); return; }
+      setStatus(`Describing how ${first} looks…`);
+      const r = await fetch("/api/ai/portrait-prompt", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: character.name, aliases: character.aliases, role: character.role, passages }),
+      });
+      const data = await r.json().catch(() => null);
+      if (!r.ok) { setError(data?.error?.message ?? "The portrait prompt couldn’t be written."); return; }
+      setPrompt(String(data.prompt));
+      setCopied(false);
+    } catch {
+      setError("The connection dropped. Please try again.");
+    } finally {
+      setBusy(null);
+      setStatus("");
+    }
+  };
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(prompt);
+      setCopied(true);
+    } catch {
+      setError("Copying was blocked. Select the text and copy it instead.");
+    }
+  };
+
+  const take = async (file: File | undefined) => {
+    if (!file || busy) return;
+    if (!file.type.startsWith("image/")) { setError("That isn’t a picture."); return; }
+    setBusy("saving");
+    setError("");
+    setStatus("Saving the portrait…");
+    try {
+      const problem = await onSave(await pictureToCover(file, PORTRAIT_WIDTH));
+      if (problem) setError(problem);
+    } catch {
+      setError("That picture couldn’t be read.");
+    } finally {
+      setBusy(null);
+      setStatus("");
+    }
+  };
+
+  return (
+    <section
+      className={`${styles.portraitMaker} ${dragging ? styles.dragging : ""}`} aria-label={`Portrait of ${character.name}`}
+      onDragOver={(e) => { e.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)}
+      onDrop={(e) => { e.preventDefault(); setDragging(false); void take(e.dataTransfer.files[0]); }}
+      onPaste={(e) => void take(Array.from(e.clipboardData.files).find((f) => f.type.startsWith("image/")))}
+    >
+      <h3>Portrait</h3>
+      {prompt ? (
+        <>
+          <textarea className={styles.promptText} readOnly value={prompt} rows={7} aria-label="Portrait prompt" onFocus={(e) => e.currentTarget.select()} />
+          <div className={styles.portraitActions}>
+            <button type="button" className={styles.primary} onClick={() => void copy()}>{copied ? "Copied" : "Copy prompt"}</button>
+            <button type="button" onClick={() => void write()} disabled={Boolean(busy)}>Rewrite</button>
+          </div>
+          <p className={styles.note}>Paste it into ChatGPT, then drop, paste or choose the picture here.</p>
+        </>
+      ) : (
+        <>
+          <p className={styles.note}>A prompt describing {first} from what you’ve read, to paste into ChatGPT.</p>
+          <button type="button" className={styles.primary} onClick={() => void write()} disabled={Boolean(busy)}>{busy === "writing" ? "Writing…" : "Write portrait prompt"}</button>
+        </>
+      )}
+      <label className={`button ${styles.pick}`}>
+        Add picture…
+        <input type="file" accept="image/*" hidden disabled={Boolean(busy)} onChange={(e) => { void take(e.target.files?.[0]); e.target.value = ""; }} />
+      </label>
+      {busy && <p className={styles.status} role="status">{status}</p>}
+      {error && <p className="error" role="alert">{error}</p>}
+    </section>
   );
 }

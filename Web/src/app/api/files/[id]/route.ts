@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { backendFetch, getOwner, sameOrigin } from "@/lib/owner";
+import { isPortraitKey, portraitFolder, portraitPath } from "@/lib/portrait";
+import { BUCKET } from "@/lib/storedJpeg";
 
 const fail = (status: number, code: string, message: string) =>
   NextResponse.json({ error: { code, message } }, { status });
@@ -35,7 +37,12 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   const response = await backendFetch(owner, `/v1/files/${id}`, undefined, "DELETE");
   if (response.status === 404) return fail(404, "not_found", "Book not found");
   if (!response.ok) return fail(502, "backend_error", "The book couldn't be removed");
-  // The backend removes the book itself; a custom cover is ours to clean up.
-  await owner.supabase.storage.from("reader-files").remove([`${owner.userId}/${id}/cover`]);
+  // The backend removes the book itself; the custom cover and portraits are ours to clean up.
+  const storage = owner.supabase.storage.from(BUCKET);
+  const { data: portraits } = await storage.list(portraitFolder(owner.userId, id), { limit: 1000 });
+  await storage.remove([
+    `${owner.userId}/${id}/cover`,
+    ...(portraits ?? []).filter((o) => isPortraitKey(o.name)).map((o) => portraitPath(owner.userId, id, o.name)),
+  ]);
   return new NextResponse(null, { status: 204 });
 }
