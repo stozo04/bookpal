@@ -25,7 +25,7 @@ export function TxtReader({ fileId, fingerprint, title, initial, meta, notes: sa
   const { notes, saveSummary, saveCast, saveProfile, saveWord, saveRecap } = useNotes(fileId, savedNotes);
   const prefs = useReaderPrefs();
   const { hidden, setHidden, onScrollY, settle } = useAutoHideBar();
-  const { schedule } = usePlaceSaver(fileId, fingerprint);
+  const { schedule, saveNotice } = usePlaceSaver(fileId, fingerprint);
   const [phase, setPhase] = useState<"loading" | "ready" | "error">("loading");
   const [paragraphs, setParagraphs] = useState<{ text: string; start: number }[]>([]);
   const [total, setTotal] = useState(1);
@@ -199,7 +199,7 @@ export function TxtReader({ fileId, fingerprint, title, initial, meta, notes: sa
   }
 
   return (
-    <ReaderChrome title={title} subtitle={`${Math.round(progress * 100)}%`} progress={progress} hidden={hidden} contents={null} prefs={prefs} ask={ask} search={search} book={bookConfig}>
+    <ReaderChrome title={title} subtitle={`${Math.round(progress * 100)}%`} progress={progress} hidden={hidden} contents={null} prefs={prefs} ask={ask} search={search} book={bookConfig} saveNotice={saveNotice}>
       <main className={styles.page} onClick={() => !window.getSelection()?.toString() && setHidden((h) => !h)}>
         <article className={styles.text}>{body}</article>
         <div ref={sentinel} aria-hidden="true" />

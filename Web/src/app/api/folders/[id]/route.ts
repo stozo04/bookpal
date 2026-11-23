@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { backendFetch, getOwner, sameOrigin } from "@/lib/owner";
+import { getOwner, sameOrigin } from "@/lib/owner";
+import { deleteFolder, updateFolder } from "@/lib/library";
 
 const body = z
   .object({ name: z.string().trim().min(1).max(200).optional(), parentId: z.string().uuid().nullable().optional() })
@@ -22,22 +23,22 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if ("error" in g) return g.error;
   const parsed = body.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return fail(400, "invalid_request", "Nothing to change");
-  const response = await backendFetch(g.owner, `/v1/folders/${g.id}`, parsed.data, "PATCH");
-  if (response.status === 409) {
-    const code = (await response.json().catch(() => null))?.error?.code;
-    return fail(409, code ?? "conflict", code === "folder_cycle" ? "A folder can't be moved inside itself" : "A folder with that name already exists there");
+  const updated = await updateFolder(g.owner.supabase, g.id, parsed.data);
+  if (updated.ok) return new NextResponse(null, { status: 204 });
+  switch (updated.code) {
+    case "folder_cycle": return fail(409, updated.code, "A folder can't be moved inside itself");
+    case "folder_already_exists": return fail(409, updated.code, "A folder with that name already exists there");
+    case "folder_not_found": return fail(404, "not_found", "Folder not found");
+    case "failed": return fail(502, "save_failed", "The folder couldn't be changed");
   }
-  if (response.status === 404) return fail(404, "not_found", "Folder not found");
-  if (!response.ok) return fail(502, "backend_error", "The folder couldn't be changed");
-  return new NextResponse(null, { status: 204 });
 }
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const g = await guard(request, params);
   if ("error" in g) return g.error;
-  const response = await backendFetch(g.owner, `/v1/folders/${g.id}`, undefined, "DELETE");
-  if (response.status === 409) return fail(409, "folder_not_empty", "Move or remove what's inside this folder first");
-  if (response.status === 404) return fail(404, "not_found", "Folder not found");
-  if (!response.ok) return fail(502, "backend_error", "The folder couldn't be removed");
+  const deleted = await deleteFolder(g.owner.supabase, g.id);
+  if (!deleted.ok && deleted.code === "folder_not_empty") return fail(409, "folder_not_empty", "Move or remove what's inside this folder first");
+  if (!deleted.ok && deleted.code === "folder_not_found") return fail(404, "not_found", "Folder not found");
+  if (!deleted.ok) return fail(502, "delete_failed", "The folder couldn't be removed");
   return new NextResponse(null, { status: 204 });
 }

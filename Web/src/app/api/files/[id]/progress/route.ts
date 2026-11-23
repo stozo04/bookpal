@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { backendFetch, getOwner, sameOrigin } from "@/lib/owner";
+import { getOwner, sameOrigin } from "@/lib/owner";
+import { placeTime, saveReadingPlace } from "@/lib/library";
 
 // Mirrors ReaderLocator in the Mac app (schemaVersion 1) so either client can
 // resume from a position written by the other.
 const body = z.object({
   deviceId: z.string().uuid(),
+  // When the reader was at this place, in ms since the epoch. Optional so a tab
+  // loaded before this field existed can still save.
+  clientUpdatedAt: z.number().int().positive().optional(),
   progress: z.number().min(0).max(1),
   locator: z.object({
     schemaVersion: z.literal(1),
@@ -30,11 +34,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const parsed = body.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return fail(400, "invalid_request", "Invalid position");
 
-  const now = Date.now() / 1000;
-  const response = await backendFetch(owner, "/v1/reading-states/sync", {
-    deviceId: parsed.data.deviceId,
-    states: [{ fileId: id, locator: parsed.data.locator, progress: parsed.data.progress, lastOpenedAt: now, updatedAt: now }],
-  });
-  if (!response.ok) return fail(502, "backend_error", "Your place couldn't be saved");
+  const { clientUpdatedAt, ...place } = parsed.data;
+  const saved = await saveReadingPlace(owner.supabase, owner.userId, { fileId: id, ...place, at: placeTime(clientUpdatedAt, Date.now()) });
+  if (!saved.ok && saved.code === "file_not_found") return fail(404, "not_found", "Book not found");
+  if (!saved.ok) return fail(502, "save_failed", "Your place couldn't be saved");
   return new NextResponse(null, { status: 204 });
 }

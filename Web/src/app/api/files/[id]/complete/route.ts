@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { backendFetch, getOwner, sameOrigin } from "@/lib/owner";
+import { getOwner, sameOrigin } from "@/lib/owner";
+import { completeUpload } from "@/lib/library";
 
 const fail = (status: number, code: string, message: string) =>
   NextResponse.json({ error: { code, message } }, { status });
@@ -12,8 +13,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(id)) return fail(400, "invalid_request", "Invalid file");
 
-  const response = await backendFetch(owner, `/v1/files/${id}/complete`, {});
-  const payload = await response.json().catch(() => null);
-  if (!response.ok) return fail(response.status === 409 ? 409 : 502, payload?.error?.code ?? "backend_error", "The upload couldn't be finished");
+  const completed = await completeUpload(owner.supabase, id);
+  if (!completed.ok) {
+    const status = completed.code === "failed" ? 502 : completed.code === "file_not_found" ? 404 : 409;
+    return fail(status, completed.code, "The upload couldn't be finished");
+  }
   return NextResponse.json({ ok: true });
 }

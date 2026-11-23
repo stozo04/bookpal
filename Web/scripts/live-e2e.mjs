@@ -8,7 +8,7 @@ await p.goto(base + "/upload", { waitUntil: "networkidle" });
 await p.locator("input[type=file]").setInputFiles("tests/fixtures/hello.txt");
 await p.waitForFunction(() => [...document.querySelectorAll("li[data-state]")].some((e) => e.textContent.includes("hello") && ["done", "duplicate", "failed"].includes(e.getAttribute("data-state"))), null, { timeout: 60000 });
 const row = (await p.locator("li[data-state]").filter({ hasText: "hello" }).first().innerText()).replace(/\s+/g, " ");
-ok("upload via hosted site + backend", /On your shelf|Already on your shelf/.test(row), row);
+ok("upload via hosted site", /On your shelf|Already on your shelf/.test(row), row);
 await p.goto(base + "/library", { waitUntil: "networkidle" });
 const card = p.getByText("hello", { exact: false }).first();
 ok("book on shelf", await card.count() > 0);
