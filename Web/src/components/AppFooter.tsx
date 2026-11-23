@@ -4,7 +4,7 @@ import styles from "./AppFooter.module.css";
 
 const KEY = "bookpal:footer-collapsed";
 
-export function AppFooter() {
+export function AppFooter({ version }: { version: string }) {
   const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
@@ -35,7 +35,7 @@ export function AppFooter() {
       </button>
       <div id="footer-content" className={styles.content} hidden={collapsed}>
         <span className={`voice ${styles.brand}`}>BookPal — a private library</span>
-        <span className="voice">Your books stay yours.</span>
+        <span className="voice">Your books stay yours. · v{version}</span>
       </div>
     </footer>
   );
