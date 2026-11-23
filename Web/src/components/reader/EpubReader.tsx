@@ -42,6 +42,34 @@ function offsetAtTop(frame: HTMLIFrameElement): number {
   return 0;
 }
 
+const LINE_STEP = 16;
+
+// Everything in the chapter up to the bottom of the visible page: what the reader can
+// see counts as read. Null when the browser can't map a point to text.
+function textUpToBottom(frame: HTMLIFrameElement): string | null {
+  const doc = frame.contentDocument;
+  const root = doc?.querySelector("article");
+  if (!doc || !root || !doc.caretRangeFromPoint) return null;
+  const x = Math.max(doc.documentElement.clientWidth / 2, 1);
+  const bottom = Math.min(window.scrollY + window.innerHeight - frame.offsetTop, frame.clientHeight) - 1;
+  const top = Math.max(window.scrollY - frame.offsetTop, 0);
+  // The bottom edge often falls in the gap between paragraphs, so step up to the last line.
+  for (let y = bottom; y > top; y -= LINE_STEP) {
+    const range = doc.caretRangeFromPoint(x, y);
+    if (!range || range.startContainer.nodeType !== Node.TEXT_NODE || !root.contains(range.startContainer)) continue;
+    const parts: string[] = [];
+    for (const node of textNodes(root, doc)) {
+      if (node === range.startContainer) {
+        const rest = node.data.slice(range.startOffset);
+        parts.push(node.data.slice(0, range.startOffset) + (rest.match(/^[^.!?]*[.!?”"’]*/)?.[0] ?? ""));
+        return parts.join("").replace(/\s+/g, " ").trim();
+      }
+      parts.push(node.data);
+    }
+  }
+  return null;
+}
+
 function scrollToOffset(frame: HTMLIFrameElement, offset: number) {
   const doc = frame.contentDocument;
   const root = doc?.querySelector("article");
@@ -311,8 +339,12 @@ export function EpubReader({ fileId, fingerprint, fallbackTitle, initial, meta, 
       if (k % 4 === 0) progress?.(`Reading chapter ${k + 1} of ${i + 1}…`);
       parts.push(await book.plainText(k));
     }
-    const current = await book.plainText(i);
-    parts.push(current.slice(0, Math.round(current.length * fr)));
+    const visible = frame.current ? textUpToBottom(frame.current) : null;
+    if (visible) parts.push(visible);
+    else {
+      const current = await book.plainText(i);
+      parts.push(current.slice(0, Math.round(current.length * fr)));
+    }
     return { text: parts.join("\n\n"), label: getLabel() };
   }, [book, getLabel]);
 

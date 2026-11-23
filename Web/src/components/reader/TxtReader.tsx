@@ -77,8 +77,7 @@ export function TxtReader({ fileId, fingerprint, title, initial, meta, notes: sa
     });
   }, [phase, paragraphs, initial, settle]);
 
-  const topParagraph = useCallback(() => {
-    const line = window.scrollY + 100;
+  const paragraphAt = useCallback((line: number) => {
     let lo = 0, hi = Math.min(shown, paragraphs.length) - 1;
     while (lo < hi) {
       const mid = (lo + hi + 1) >> 1;
@@ -88,6 +87,9 @@ export function TxtReader({ fileId, fingerprint, title, initial, meta, notes: sa
     }
     return lo;
   }, [shown, paragraphs.length]);
+  const topParagraph = useCallback(() => paragraphAt(window.scrollY + 100), [paragraphAt]);
+  // What the reader can see counts as read.
+  const bottomParagraph = useCallback(() => paragraphAt(window.scrollY + window.innerHeight), [paragraphAt]);
 
   useEffect(() => {
     if (phase !== "ready") return;
@@ -127,9 +129,9 @@ export function TxtReader({ fileId, fingerprint, title, initial, meta, notes: sa
     [paragraphs, total, topParagraph],
   );
   const getTextSoFar = useCallback(async () => {
-    const text = paragraphs.slice(0, topParagraph() + 1).map((p) => p.text).join("\n\n");
+    const text = paragraphs.slice(0, bottomParagraph() + 1).map((p) => p.text).join("\n\n");
     return { text, label: getLabel() };
-  }, [paragraphs, topParagraph, getLabel]);
+  }, [paragraphs, bottomParagraph, getLabel]);
 
   const bookConfig = useMemo<BookConfig>(() => ({
     info: { fileId, title, format: "Text", ...meta },
