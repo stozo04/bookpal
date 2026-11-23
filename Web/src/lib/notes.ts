@@ -24,8 +24,11 @@ export type ReaderNotes = {
 // never from further on (that could spoil), and not from much earlier (it would be stale).
 export const SAME_PLACE = { behind: 0.02, ahead: 0.004 };
 export function atThisPlace(madeAt: number, now: number): boolean {
-  return now - madeAt <= SAME_PLACE.behind && madeAt - now <= SAME_PLACE.ahead;
+  return now - madeAt <= SAME_PLACE.behind && notAhead(madeAt, now);
 }
+
+// Made no further on than the reader is now, so it can't spoil anything.
+export const notAhead = (madeAt: number, now: number) => madeAt - now <= SAME_PLACE.ahead;
 
 // The saved note made closest to where the reader is now, if any is close enough.
 export function findNear<T extends { progress: number }>(notes: Record<string, T>, now: number): (T & { label: string }) | null {

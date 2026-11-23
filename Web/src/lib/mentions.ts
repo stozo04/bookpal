@@ -11,10 +11,32 @@ export function nameVariants(name: string, aliases: string[] = [], avoid: string
   return [...out];
 }
 
+const nameRe = (variants: string[]) =>
+  new RegExp(`(?<![\\p{L}\\p{N}])(?:${variants.map(escapeRe).join("|")})(?![\\p{L}\\p{N}])`, "iu");
+const splitSentences = (text: string) => text.split(/(?<=[.!?”"’])\s+/).filter(Boolean);
+
+const LOOKS = /\b(wear(?:s|ing)?|wore|dressed|outfit|jersey|shirt|t-shirt|sweater|hoodie|jacket|coat|suit|tie|dress|skirt|jeans|trousers|pants|shorts|uniform|cap|hat|boots|shoes|sneakers|glasses|spectacles|hair(?:ed)?|bald|beard(?:ed)?|mustache|moustache|stubble|eyes|eyed|freckles|skin|complexion|tall|short|stocky|slim|slender|thin|heavyset|muscular|petite|tattoo(?:s|ed)?|scar|wrinkles?|gray|grey|blond(?:e)?|brunette|redhead)\b/i;
+
+// Sentences that name the person and describe how they look, so a portrait never loses
+// them to the sampling gatherMentions does on long books.
+export function gatherAppearance(text: string, variants: string[], budget = 4_000): string {
+  if (variants.length === 0) return "";
+  const re = nameRe(variants);
+  const out: string[] = [];
+  let used = 0;
+  for (const s of splitSentences(text)) {
+    if (!re.test(s) || !LOOKS.test(s)) continue;
+    if (used + s.length > budget) break;
+    out.push(s);
+    used += s.length + 1;
+  }
+  return out.join("\n");
+}
+
 export function gatherMentions(text: string, variants: string[], budget = 40_000): string {
   if (variants.length === 0) return "";
-  const re = new RegExp(`(?<![\\p{L}\\p{N}])(?:${variants.map(escapeRe).join("|")})(?![\\p{L}\\p{N}])`, "iu");
-  const sentences = text.split(/(?<=[.!?”"’])\s+/).filter(Boolean);
+  const re = nameRe(variants);
+  const sentences = splitSentences(text);
 
   // Each mention with a sentence either side, merged where they touch.
   const groups: { from: number; to: number }[] = [];

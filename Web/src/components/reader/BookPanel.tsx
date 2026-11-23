@@ -4,8 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { BookEditor } from "../BookEditor";
 import { readMeta } from "@/lib/covers";
 import { GRAPH_H, GRAPH_W, initials, layout, type Character } from "@/lib/castgraph";
-import { gatherMentions, nameVariants } from "@/lib/mentions";
-import { atThisPlace, type Profile, type ReaderNotes } from "@/lib/notes";
+import { gatherAppearance, gatherMentions, nameVariants } from "@/lib/mentions";
+import { atThisPlace, notAhead, type Profile, type ReaderNotes } from "@/lib/notes";
 import { pictureToCover } from "@/lib/images";
 import { portraitKey } from "@/lib/portrait";
 import { useRouter } from "next/navigation";
@@ -295,7 +295,8 @@ async function passagesAbout(book: BookConfig, character: Character, cast: Chara
   const { text, label } = await book.getTextSoFar((m) => setStatus(m));
   setStatus(`Finding every place ${character.name.split(" ")[0]} appears…`);
   const others = cast.filter((c) => c.name !== character.name).map((c) => c.name);
-  return { passages: gatherMentions(text, nameVariants(character.name, character.aliases, others)), label, others };
+  const variants = nameVariants(character.name, character.aliases, others);
+  return { passages: gatherMentions(text, variants), looks: gatherAppearance(text, variants), label, others };
 }
 
 // Everything the story has shown about one person, built once from every passage that
@@ -357,7 +358,10 @@ function ProfileView({ book, character, cast, onBack, onOpen }: {
           {portrait.url && <button type="button" className={styles.quiet} onClick={() => void portrait.remove()}>Remove portrait</button>}
         </div>
       </div>
-      {portrait.ready && !portrait.url && <PortraitMaker book={book} character={character} cast={cast} onSave={portrait.save} />}
+      {portrait.ready && !portrait.url && (
+        <PortraitMaker book={book} character={character} cast={cast} onSave={portrait.save}
+          known={saved && notAhead(saved.progress, book.getProgress()) ? saved.profile : undefined} />
+      )}
 
       {!p ? (
         <div>
@@ -453,8 +457,8 @@ const PORTRAIT_WIDTH = 640;
 
 // No picture yet: write a prompt from the book to paste into ChatGPT, then take the
 // picture it makes (chosen, dropped or pasted) and save it.
-function PortraitMaker({ book, character, cast, onSave }: {
-  book: BookConfig; character: Character; cast: Character[]; onSave: (picture: Blob) => Promise<string | null>;
+function PortraitMaker({ book, character, cast, known, onSave }: {
+  book: BookConfig; character: Character; cast: Character[]; known?: Profile; onSave: (picture: Blob) => Promise<string | null>;
 }) {
   const [prompt, setPrompt] = useState("");
   const [status, setStatus] = useState("");
@@ -468,12 +472,14 @@ function PortraitMaker({ book, character, cast, onSave }: {
     setBusy("writing");
     setError("");
     try {
-      const { passages } = await passagesAbout(book, character, cast, setStatus);
-      if (passages.length < 40) { setError(`${character.name} hasn’t appeared enough yet to describe.`); return; }
+      const { passages, looks } = await passagesAbout(book, character, cast, setStatus);
+      // A first-person narrator is rarely named, so the saved profile fills in for them.
+      const notes = known ? [known.summary, known.traits.join(", "), known.wants].filter(Boolean).join("\n") : "";
+      if (passages.length < 40 && !notes) { setError(`${character.name} hasn’t appeared enough yet to describe.`); return; }
       setStatus(`Describing how ${first} looks…`);
       const r = await fetch("/api/ai/portrait-prompt", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name: character.name, aliases: character.aliases, role: character.role, passages }),
+        body: JSON.stringify({ name: character.name, aliases: character.aliases, role: character.role, looks, passages, notes }),
       });
       const data = await r.json().catch(() => null);
       if (!r.ok) { setError(data?.error?.message ?? "The portrait prompt couldn’t be written."); return; }
