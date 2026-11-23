@@ -13,7 +13,9 @@ BookPal's version rules are in `AGENTS.md` under "Versioning". A release is a
    git push origin "v$(node -p 'require("./Web/package.json").version')"
    ```
 
-4. Publish release notes for the tag:
+4. Publish the GitHub release for the tag. The reader-facing notes are the
+   tag's entry in `Web/src/lib/releaseNotes.ts`, which the app shows in
+   What's New; the generated notes list the PRs behind them:
 
    ```bash
    gh release create "v$(node -p 'require("./Web/package.json").version')" --generate-notes

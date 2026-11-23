@@ -1,6 +1,4 @@
-// BookPal's release history, newest first, shown from the version in the footer.
-// Every version bump adds its entry at the top (AGENTS.md, "Versioning"), and
-// scripts/check-version-bump.sh fails CI when the current version has none.
+// Every version bump adds its entry at the top (AGENTS.md, "Versioning").
 
 export type ChangeKind = "New" | "Improved" | "Fixed" | "Removed";
 export type Change = { kind: ChangeKind; text: string };
@@ -23,6 +21,7 @@ export const RELEASES: Release[] = [
     ],
   },
   {
+    // Everything up to the first tagged release.
     version: "0.3.0",
     date: "2026-11-23",
     changes: [

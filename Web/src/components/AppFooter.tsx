@@ -36,7 +36,7 @@ export function AppFooter({ version }: { version: string }) {
       </button>
       <div id="footer-content" className={styles.content} hidden={collapsed}>
         <span className={`voice ${styles.brand}`}>BookPal — a private library</span>
-        <span className={`voice ${styles.meta}`}>Your books stay yours. · <WhatsNew version={version} /></span>
+        <div className={`voice ${styles.meta}`}>Your books stay yours. · <WhatsNew version={version} /></div>
       </div>
     </footer>
   );

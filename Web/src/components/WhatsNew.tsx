@@ -9,22 +9,31 @@ const KIND_CLASS: Record<ChangeKind, string> = {
   Fixed: styles.fixed,
   Removed: styles.removed,
 };
+// Long enough to cross the gap between the label and the panel without it closing.
 const HOVER_CLOSE_DELAY_MS = 200;
 
-// The footer's version label. Pointing at it previews the release history;
-// clicking pins it open until Escape, a click elsewhere, or a second click.
 export function WhatsNew({ version }: { version: string }) {
   const [pinned, setPinned] = useState(false);
   const [hovering, setHovering] = useState(false);
   const root = useRef<HTMLDivElement>(null);
+  const button = useRef<HTMLButtonElement>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const panelId = useId();
   const open = pinned || hovering;
 
+  const close = () => {
+    setPinned(false);
+    setHovering(false);
+  };
+
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && (setPinned(false), setHovering(false));
-    const onPointer = (e: PointerEvent) => !root.current?.contains(e.target as Node) && (setPinned(false), setHovering(false));
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      close();
+      if (root.current?.contains(document.activeElement)) button.current?.focus();
+    };
+    const onPointer = (e: PointerEvent) => !root.current?.contains(e.target as Node) && close();
     document.addEventListener("keydown", onKey);
     document.addEventListener("pointerdown", onPointer);
     return () => {
@@ -43,23 +52,27 @@ export function WhatsNew({ version }: { version: string }) {
     if (e.pointerType !== "mouse") return;
     closeTimer.current = setTimeout(() => setHovering(false), HOVER_CLOSE_DELAY_MS);
   };
+  const onBlur = (e: React.FocusEvent) => {
+    if (!root.current?.contains(e.relatedTarget as Node | null)) setPinned(false);
+  };
 
   return (
-    <div ref={root} className={styles.root} onPointerEnter={onPointerEnter} onPointerLeave={onPointerLeave}>
+    <div ref={root} className={styles.root} onPointerEnter={onPointerEnter} onPointerLeave={onPointerLeave} onBlur={onBlur}>
       <button
+        ref={button}
         type="button"
         className={styles.version}
         aria-expanded={open}
-        aria-controls={panelId}
-        aria-label={`Version ${version}. What’s New`}
+        aria-controls={open ? panelId : undefined}
+        aria-label={`v${version}, What’s New`}
         onClick={() => { setPinned(!pinned); setHovering(false); }}
       >
         v{version}
       </button>
       {open && (
-        <section id={panelId} className={styles.panel} role="dialog" aria-label="What’s New">
-          <h2 className={styles.title}>What’s New</h2>
-          <div className={styles.list}>
+        <section id={panelId} className={styles.panel} aria-labelledby={`${panelId}-title`}>
+          <h2 id={`${panelId}-title`} className={styles.title}>What’s New</h2>
+          <div className={styles.list} tabIndex={0} aria-label="Release history">
             {RELEASES.map((release) => (
               <article key={release.version} className={styles.release}>
                 <header className={styles.head}>

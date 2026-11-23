@@ -26,9 +26,9 @@ test("every release has a real date and at least one described change", () => {
   for (const release of RELEASES) {
     assert.match(release.version, /^\d+\.\d+\.\d+$/);
     assert.match(release.date, /^\d{4}-\d{2}-\d{2}$/);
-    assert.ok(!Number.isNaN(Date.parse(release.date)), release.date);
+    assert.equal(new Date(`${release.date}T00:00:00Z`).toISOString().slice(0, 10), release.date, `${release.version} has an impossible date`);
     assert.ok(release.changes.length > 0, `${release.version} lists no changes`);
-    for (const change of release.changes) assert.ok(change.text.trim().length > 10, `${release.version} has an empty change`);
+    for (const change of release.changes) assert.ok(change.text.trim().length > 10, `${release.version} has a change too short to tell a reader anything`);
   }
 });
 

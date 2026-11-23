@@ -12,7 +12,8 @@ current="$(single_version HEAD)"
 base_version="$(single_version "$base")"
 
 notes_file="Web/src/lib/releaseNotes.ts"
-if ! git show "HEAD:$notes_file" | grep -qF "version: \"$current\""; then
+notes="$(git show "HEAD:$notes_file")"
+if ! grep -qF "version: \"$current\"" <<< "$notes"; then
   echo "::error file=$notes_file::Version $current has no release notes. Add its entry at the top of RELEASES." >&2
   exit 1
 fi
