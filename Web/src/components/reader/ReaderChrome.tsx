@@ -24,14 +24,15 @@ type Props = {
   ask?: AskConfig;
   search?: SearchConfig;
   book?: BookConfig;
-  /** Shown as a chevron in the top bar; omitted when there is no next chapter. */
+  /** Shown as chevrons in the top bar; each is omitted when there is no chapter that way. */
+  onPrevChapter?: () => void;
   onNextChapter?: () => void;
   children: React.ReactNode;
 };
 
 // The quiet frame shared by every reader: top bar, progress line, appearance
 // popover and contents drawer. The reader itself is the child.
-export function ReaderChrome({ title, subtitle, progress, hidden, contents, prefs, sizeLabel = "Size", showTypeface = true, ask, search, book, onNextChapter, children }: Props) {
+export function ReaderChrome({ title, subtitle, progress, hidden, contents, prefs, sizeLabel = "Size", showTypeface = true, ask, search, book, onPrevChapter, onNextChapter, children }: Props) {
   const wantsCatchup = useSearchParams().get("catchup") === "1";
   const [panel, setPanel] = useState<Panel>(null);
   const [recapOnOpen, setRecapOnOpen] = useState(false);
@@ -72,14 +73,20 @@ export function ReaderChrome({ title, subtitle, progress, hidden, contents, pref
     <div className={styles.root} style={vars}>
       <header className={`${styles.bar} ${hidden && !panel ? styles.hidden : ""}`}>
         <div className={styles.barInner}>
-          <Link href="/library" className={styles.icon} aria-label="Back to library">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
+          <Link href="/library" className={`${styles.icon} ${styles.library}`} aria-label="Back to library" title="Back to library">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h3.5v16H4zM9.5 4H13v16H9.5z" /><path d="M15 5.2l3.4-.9 3.1 14.6-3.4.9z" /><path d="M2.5 20h19" /></svg>
+            <span className={styles.iconLabel}>Library</span>
           </Link>
           <div className={styles.titles}>
             <div className={styles.book}>{title}</div>
             <div className={styles.chapter}>{subtitle ?? ""}</div>
           </div>
           <div className={styles.tools}>
+            {onPrevChapter && (
+              <button type="button" className={styles.icon} aria-label="Previous chapter" title="Previous chapter" onClick={onPrevChapter}>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
+              </button>
+            )}
             {onNextChapter && (
               <button type="button" className={styles.icon} aria-label="Next chapter" title="Next chapter" onClick={onNextChapter}>
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
