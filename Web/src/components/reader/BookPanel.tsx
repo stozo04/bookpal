@@ -375,6 +375,12 @@ function ProfileView({ book, character, cast, portrait, onBack, onOpen }: {
         </div>
       </div>
       <RemovePortraitDialog open={removing} name={character.name} onClose={() => setRemoving(false)} remove={portrait.remove} />
+      {portrait.failed && (
+        <div className={styles.portraitMaker} role="alert">
+          <p className={styles.note}>Portraits couldn’t be loaded.</p>
+          <button type="button" onClick={portrait.retry}>Try again</button>
+        </div>
+      )}
       {portrait.ready && !portrait.url && (
         <PortraitMaker book={book} character={character} cast={cast} onSave={portrait.save}
           known={saved && notAhead(saved.progress, book.getProgress()) ? saved.profile : undefined} />
@@ -437,6 +443,8 @@ type SavedPortrait = { key: string; version: string };
 type Portrait = {
   url: string | null;
   ready: boolean;
+  failed: boolean;
+  retry: () => void;
   save: (picture: Blob) => Promise<string | null>;
   remove: () => Promise<string | null>;
 };
@@ -446,17 +454,22 @@ type Portrait = {
 function usePortraits(fileId: string, names: string[]) {
   const [versions, setVersions] = useState<Record<string, string> | null>(null); // by key
   const [keys, setKeys] = useState<Record<string, string>>({}); // by name
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const nameList = names.join("\n");
 
+  // Until the list arrives nothing is offered: guessing "none" could hide a saved picture
+  // and let a new upload replace it unseen.
   useEffect(() => {
     let live = true;
+    setFailed(false);
     void fetch(`/api/files/${fileId}/portraits`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((d: { portraits: SavedPortrait[] }) => live && setVersions(Object.fromEntries(d.portraits.map((p) => [p.key, p.version]))))
-      // Without the list, still offer to add one: saving overwrites, so nothing is lost.
-      .catch(() => live && setVersions({}));
+      .catch(() => live && setFailed(true));
     return () => { live = false; };
-  }, [fileId]);
+  }, [fileId, attempt]);
+  const retry = () => setAttempt((n) => n + 1);
 
   useEffect(() => {
     let live = true;
@@ -477,6 +490,8 @@ function usePortraits(fileId: string, names: string[]) {
     return {
       url: urlOf(name),
       ready: versions !== null && Boolean(key),
+      failed: versions === null && failed,
+      retry,
       save: async (picture) => {
         if (!key) return "The portrait couldn’t be saved.";
         const r = await fetch(pathOf(key), { method: "PUT", headers: { "content-type": "image/jpeg" }, body: picture }).catch(() => null);
