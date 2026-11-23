@@ -10,7 +10,7 @@ permissions:
 
 concurrency:
   group: version-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   version:
@@ -21,12 +21,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
       - name: One version everywhere, raised above main (AGENTS.md, "Versioning")
         env:
           BASE_REF: ${{ github.base_ref }}
+          PREVIOUS_MAIN: ${{ github.event.before }}
         run: |
           if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
             scripts/check-version-bump.sh "origin/$BASE_REF"
           else
-            scripts/check-version-bump.sh HEAD
+            scripts/check-version-bump.sh "$PREVIOUS_MAIN"
           fi
